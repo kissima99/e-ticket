@@ -6,9 +6,9 @@
   :root {
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
-    --primary: 210 100% 20%;
+    --primary: 210 100% 15%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 45 100% 50%;
+    --secondary: 24 100% 50%;
     --secondary-foreground: 222.2 84% 4.9%;
     --muted: 210 40% 96%;
     --muted-foreground: 215.4 16.3% 46.9%;
@@ -21,7 +21,7 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
-    --radius: 0.75rem;
+    --radius: 1rem;
   }
 }
 
@@ -47,37 +47,37 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #003366;
+  background: #002244;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #002244;
+  background: #001122;
 }
 
-/* Utility classes for brand colors */
-.bg-brand-blue {
-  background-color: #003366;
+/* Brand colors */
+.bg-brand-navy {
+  background-color: #002244;
 }
 
-.text-brand-blue {
-  color: #003366;
+.text-brand-navy {
+  color: #002244;
 }
 
-.border-brand-blue {
-  border-color: #003366;
+.border-brand-navy {
+  border-color: #002244;
 }
 
-.bg-brand-yellow {
-  background-color: #FFC107;
+.bg-brand-orange {
+  background-color: #FF6B00;
 }
 
-.text-brand-yellow {
-  color: #FFC107;
+.text-brand-orange {
+  color: #FF6B00;
 }
 
-.border-brand-yellow {
-  border-color: #FFC107;
+.border-brand-orange {
+  border-color: #FF6B00;
 }
 
 /* Custom button styles */
@@ -86,16 +86,20 @@
 }
 
 .btn-transport-primary {
-  @apply bg-brand-blue text-white hover:bg-blue-800 focus-visible:ring-2 focus-visible:ring-[#003366];
+  @apply bg-brand-orange text-white hover:bg-orange-600 focus-visible:ring-brand-orange;
 }
 
 .btn-transport-secondary {
-  @apply bg-brand-yellow text-brand-blue hover:bg-yellow-500 focus-visible:ring-2 focus-visible:ring-[#FFC107];
+  @apply bg-brand-navy text-white hover:bg-navy-800 focus-visible:ring-brand-navy;
 }
 
 /* Card styles */
 .card-transport {
   @apply rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md;
+}
+
+.card-transport-icon {
+  @apply flex items-center justify-between p-4 rounded-xl border border-gray-200 bg-white cursor-pointer hover:border-brand-orange hover:shadow-md transition-all;
 }
 
 /* Progress bar */
@@ -104,5 +108,52 @@
 }
 
 .progress-transport-fill {
-  @apply h-full bg-brand-yellow transition-all duration-300;
+  @apply h-full bg-brand-orange transition-all duration-300;
+}
+
+/* Curved accent shape */
+.curved-accent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: #FF6B00;
+  border-radius: 0 0 50% 50%;
+}
+
+/* Poster style typography */
+.poster-title {
+  font-family: 'Arial Black', 'Impact', sans-serif;
+  font-weight: 900;
+  letter-spacing: -2px;
+  line-height: 0.9;
+  text-transform: uppercase;
+}
+
+/* Mobile screen style */
+.mobile-screen {
+  background-color: #002244;
+  min-height: 100vh;
+}
+
+/* Payment option card */
+.payment-option {
+  @apply flex items-center justify-between p-4 rounded-xl border border-gray-200 bg-white cursor-pointer hover:border-brand-orange hover:shadow-md transition-all;
+}
+
+/* Logo style */
+.logo-transport {
+  font-family: 'Arial Black', sans-serif;
+  letter-spacing: 2px;
+}
+
+/* Orange arrow button */
+.arrow-orange {
+  @apply flex items-center justify-center w-10 h-10 rounded-full bg-brand-orange text-white;
+}
+
+/* Large orange button */
+.btn-orange-large {
+  @apply flex items-center justify-between w-full px-6 py-4 rounded-xl bg-brand-orange text-white font-bold text-lg hover:bg-orange-600 transition-colors;
 }
