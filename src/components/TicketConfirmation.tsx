@@ -6,10 +6,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { formatAmount, formatTravelDate, type BookingTicket } from "@/lib/booking";
 import { createTicketPdf } from "@/lib/ticket-pdf";
+import { rememberedLoyaltyAccess } from "@/lib/loyalty-access";
 import TicketQr from "@/components/TicketQr";
 
 export default function TicketConfirmation({ ticket, onNewBooking }: { ticket: BookingTicket; onNewBooking: () => void }) {
   const [sharing, setSharing] = useState(false);
+  const loyaltyAccess = rememberedLoyaltyAccess(ticket.phone);
   const filename = `${ticket.ticket_id}.pdf`;
   const message = `BALLOU SERVICE EXPRESS - DABO TRANSPORT\nConfirmation de réservation\nTicket : ${ticket.ticket_id}\n${ticket.departure_city} → ${ticket.arrival_city}\n${formatTravelDate(ticket.travel_date)} à 15h00\nVoyageur : ${ticket.full_name}\nSiège(s) : ${ticket.seat_number}\nPassagers : ${ticket.passenger_count}\nMontée : ${ticket.boarding_point}\nTotal : ${formatAmount(ticket.total_amount)}\nMode : ${ticket.payment_method}\nPaiement : ${ticket.payment_status}\nPrésentez-vous 30 minutes avant le départ avec votre pièce d’identité. Ce ticket ne constitue pas une preuve de paiement.`;
   async function download() {
@@ -46,8 +48,8 @@ export default function TicketConfirmation({ ticket, onNewBooking }: { ticket: B
           <div className="grid gap-3 sm:grid-cols-2"><Button onClick={download} className="h-12 rounded-xl bg-brand-orange font-bold text-brand-navy hover:bg-orange-500"><Download /> Télécharger le PDF</Button><Button asChild className="h-12 rounded-xl bg-green-700 font-bold text-white hover:bg-green-800"><a href={`https://wa.me/${ticket.phone.replace(/\D/g, "")}?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer"><MessageCircle /> Envoyer via WhatsApp</a></Button></div>
           <Button variant="outline" disabled={sharing} onClick={sharePdf} className="mt-3 h-12 w-full rounded-xl border-slate-300 text-brand-navy"><Share2 /> {sharing ? "Ouverture du partage…" : "Partager le fichier PDF"}</Button>
           <p className="mt-3 text-xs leading-relaxed text-slate-500">WhatsApp ouvre un message destiné au numéro voyageur, à envoyer vous-même. Pour joindre le PDF, utilisez le partage de fichier sur mobile ou attachez le PDF téléchargé. Aucun envoi automatique n’est effectué.</p>
-          <Button asChild variant="outline" className="mt-5 h-12 w-full rounded-xl border-orange-200 text-brand-navy hover:bg-orange-50"><Link to="/fidelite" state={{ phone: ticket.phone, ticketId: ticket.ticket_id }}>Consulter ma carte cadeau & fidélité</Link></Button>
-          <p className="mt-2 text-xs text-slate-500">Conservez le numéro de votre tout premier ticket privé : il sert de clé d’accès à votre carte avec votre téléphone. Les tickets suivants ne remplacent pas cette clé.</p>
+          <Button asChild variant="outline" className="mt-5 h-12 w-full rounded-xl border-orange-200 text-brand-navy hover:bg-orange-50"><Link to="/fidelite" state={{ phone: ticket.phone, ticketId: loyaltyAccess?.ticket_id || ticket.ticket_id }}>Consulter ma carte cadeau & fidélité</Link></Button>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">{loyaltyAccess ? "Votre téléphone est reconnu sur cet appareil : votre carte conserve la clé du premier ticket. Ce nouveau ticket ajoutera automatiquement 1 point après confirmation du paiement." : "Activez votre carte avec votre téléphone et votre tout premier ticket. Sur votre appareil personnel, mémorisez cet accès : les prochains tickets au même téléphone cumuleront automatiquement leurs points après paiement."}</p>
           <Button variant="ghost" onClick={onNewBooking} className="mt-6 w-full rounded-xl text-brand-navy hover:bg-orange-50">Faire une nouvelle réservation</Button>
         </CardContent>
       </Card>

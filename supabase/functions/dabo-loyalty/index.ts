@@ -22,7 +22,7 @@ Deno.serve(async req => {
     const input = parsed.data;
     const client = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
     // The unguessable ticket identifier is a private access credential, verified against its phone.
-    const { data: ticket, error: accessError } = await client.from("reservations_dabo").select("id,full_name").eq("ticket_id", input.ticket_id).eq("phone", input.phone).not("request_id", "is", null).maybeSingle();
+    const { data: ticket, error: accessError } = await client.from("reservations_dabo").select("id,full_name,payment_status").eq("ticket_id", input.ticket_id).eq("phone", input.phone).not("request_id", "is", null).maybeSingle();
     if (accessError) throw accessError;
     if (!ticket) return reply({ error: "Téléphone ou ticket incorrect. Utilisez le numéro complet de votre premier ticket.", code: "ACCESS_DENIED" });
     const { data: accessProfile, error: profileError } = await client.from("loyalty_profiles").select("access_ticket_id").eq("phone", input.phone).maybeSingle();
@@ -45,9 +45,11 @@ Deno.serve(async req => {
       client.from("loyalty_transactions").select("id,points_change,type,description,created_at").eq("phone", input.phone).order("created_at", { ascending: false }).limit(20),
       client.from("gift_cards").select("id,code,discount_percent,reward_type,is_used,created_at").eq("created_for_phone", input.phone).order("created_at", { ascending: false }).limit(20),
       client.from("reward_requests").select("id,phone,operator,reward_type,status,created_at").eq("account_phone", input.phone).order("created_at", { ascending: false }).limit(20),
+      client.from("reservations_dabo").select("id", { count: "exact", head: true }).eq("phone", input.phone).not("request_id", "is", null).eq("payment_status", "Payé"),
+      client.from("reservations_dabo").select("id", { count: "exact", head: true }).eq("phone", input.phone).not("request_id", "is", null).eq("payment_status", "En attente"),
     ]);
     for (const result of results) if (result.error) throw result.error;
-    return reply({ snapshot: { full_name: ticket.full_name, phone: input.phone, points_balance: results[0].data?.points_balance || 0, total_lifetime_points: results[0].data?.total_lifetime_points || 0, transactions: results[1].data || [], cards: results[2].data || [], requests: results[3].data || [] }, reward });
+    return reply({ snapshot: { full_name: ticket.full_name, phone: input.phone, points_balance: results[0].data?.points_balance || 0, total_lifetime_points: results[0].data?.total_lifetime_points || 0, transactions: results[1].data || [], cards: results[2].data || [], requests: results[3].data || [], paid_tickets: results[4].count || 0, pending_tickets: results[5].count || 0, first_ticket_paid: ticket.payment_status === "Payé", checked_at: new Date().toISOString() }, reward });
   } catch {
     console.error("[dabo-loyalty] Loyalty operation failed");
     return reply({ error: "Service fidélité indisponible. Réessayez ; une même demande n’est débitée qu’une fois." }, 500);
