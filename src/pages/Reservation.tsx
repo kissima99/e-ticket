@@ -1,552 +1,147 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { ArrowLeft, ArrowRight, Banknote, Check, CheckCircle2, CreditCard, Loader2, MapPin, Smartphone, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Progress } from "@/components/ui/progress";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Bus, Calendar, MapPin, User, Phone, CreditCard, ChevronRight, CheckCircle, AlertCircle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useSearchParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import TransportHeader from "@/components/TransportHeader";
+import TicketConfirmation from "@/components/TicketConfirmation";
+import { bookingSchema, cities, formatAmount, formatTravelDate, type BookingForm, type BookingTicket } from "@/lib/booking";
 
-const CITIES = [
-  "Dakar", "Ballou", "Touba", "Dara Djolof", "Ouroussogui",
-  "Sèmè", "Tamba", "Kaolack", "Goudiry", "Kidira", "Bakel", "Bema", "Gabou", "Sarré"
-];
-
-const DEPARTURE_DAYS = {
-  "Dakar": ["Mardi", "Samedi"],
-  "Ballou": ["Lundi", "Jeudi"],
-};
-
-const SEATS = Array.from({ length: 45 }, (_, i) => (i + 1).toString());
+type Draft = Omit<BookingForm, "departure_city"> & { departure_city: string };
+const stepNames = ["Trajet", "Voyageur", "Paiement", "Ticket"];
+const stepFields = [["departure_city", "arrival_city", "travel_date", "seats"], ["civility", "full_name", "phone", "identity_document_type", "identity_document_number", "emergency_contact", "boarding_point", "luggage_count"], ["payment_method"]];
+const inputClass = "h-12 rounded-xl border-slate-200 bg-white text-brand-navy focus-visible:ring-brand-orange";
+const actionClass = "h-12 rounded-xl bg-brand-orange px-6 font-bold text-brand-navy hover:bg-orange-500";
 
 export default function Reservation() {
   const [params] = useSearchParams();
+  const initial = (): Draft => ({ departure_city: ["Dakar", "Ballou"].includes(params.get("departure") || "") ? params.get("departure")! : "Dakar", arrival_city: cities.includes(params.get("arrival") || "") ? params.get("arrival")! : "Ballou", travel_date: /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") || "") ? params.get("date")! : "", seats: [""], civility: "M.", full_name: "", phone: "", identity_document_type: "CNI", identity_document_number: "", emergency_contact: "", boarding_point: "", luggage_count: 0, payment_method: "Cash" });
+  const [form, setForm] = useState<Draft>(initial);
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({
-    departure_city: CITIES.includes(params.get("departure") || "") ? params.get("departure")! : "",
-    arrival_city: CITIES.includes(params.get("arrival") || "") ? params.get("arrival")! : "",
-    travel_date: /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") || "") ? params.get("date")! : "",
-    seat_number: "",
-    passenger_count: 1,
-    civility: "M.",
-    full_name: "",
-    phone: "",
-    identity_document_type: "CNI",
-    identity_document_number: "",
-    emergency_contact: "",
-    boarding_point: "",
-    luggage_count: 0,
-    payment_method: "Wave",
-  });
-  const [loading, setLoading] = useState(false);
-  const [ticketId, setTicketId] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [ticket, setTicket] = useState<BookingTicket | null>(null);
+  const [accepted, setAccepted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [taken, setTaken] = useState<string[]>([]);
+  const [checking, setChecking] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState("");
+  const [refresh, setRefresh] = useState(0);
+  const [serverError, setServerError] = useState("");
+  const requestId = useRef(crypto.randomUUID());
+  const headingRef = useRef<HTMLHeadingElement>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
+  useEffect(() => { headingRef.current?.focus(); }, [step]);
+  useEffect(() => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(form.travel_date)) { setTaken([]); setChecking(false); setAvailabilityError(""); return; }
+    let active = true;
+    setChecking(true); setAvailabilityError("");
+    supabase.functions.invoke("dabo-booking", { body: { action: "availability", data: { departure_city: form.departure_city, travel_date: form.travel_date } } }).then(({ data, error }) => {
+      if (!active) return;
+      if (error || data?.error || !Array.isArray(data?.taken)) { setAvailabilityError("Impossible de vérifier les sièges. Réessayez avant de continuer."); setTaken([]); }
+      else setTaken(data.taken);
+      setChecking(false);
+    }).catch(() => { if (active) { setChecking(false); setAvailabilityError("Vérification des sièges indisponible."); } });
+    return () => { active = false; };
+  }, [form.departure_city, form.travel_date, refresh]);
 
-  const handleRadioChange = (name: string, value: string) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleCheckboxChange = (name: string, checked: boolean) => {
-    setFormData(prev => ({ ...prev, [name]: checked }));
-  };
-
-  const getNextTravelDate = (departure: string) => {
-    const days = DEPARTURE_DAYS[departure as keyof typeof DEPARTURE_DAYS] || [];
-    const today = new Date();
-    const dayNames = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
-    
-    for (let i = 0; i < 14; i++) {
-      const checkDate = new Date(today);
-      checkDate.setDate(today.getDate() + i);
-      const dayName = dayNames[checkDate.getDay()];
-      if (days.includes(dayName)) {
-        return checkDate.toISOString().split("T")[0];
-      }
-    }
-    return "";
-  };
-
-  const validateStep = () => {
-    if (step === 1) {
-      return formData.departure_city && formData.arrival_city && formData.travel_date && formData.seat_number;
-    }
-    if (step === 2) {
-      return formData.civility && formData.full_name && formData.phone && 
-             formData.identity_document_type && formData.identity_document_number &&
-             formData.emergency_contact && formData.boarding_point;
-    }
-    if (step === 3) {
-      return formData.payment_method;
+  function update<K extends keyof Draft>(key: K, value: Draft[K]) {
+    setForm(previous => ({ ...previous, [key]: value }));
+    setErrors({}); setServerError(""); setAccepted(false);
+  }
+  function validate(upTo: number) {
+    const result = bookingSchema.safeParse(form);
+    const keys = stepFields.slice(0, upTo).flat();
+    const messages: Record<string, string> = {};
+    if (!result.success) for (const issue of result.error.issues) if (keys.includes(String(issue.path[0]))) messages[issue.path.join(".")] = issue.message;
+    if (upTo >= 1 && form.seats.some(seat => taken.includes(seat))) messages.seats = "Un siège choisi est déjà réservé. Sélectionnez un siège disponible.";
+    if (upTo >= 1 && (checking || availabilityError)) messages.seats = checking ? "Veuillez attendre la vérification des sièges." : availabilityError;
+    setErrors(messages);
+    if (Object.keys(messages).length) {
+      const firstInvalidStep = stepFields.findIndex(fields => Object.keys(messages).some(key => fields.includes(key.split(".")[0])));
+      if (firstInvalidStep >= 0) setStep(firstInvalidStep + 1);
+      toast.error("Vérifiez les champs signalés avant de continuer.");
+      return false;
     }
     return true;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateStep()) {
-      toast.error("Veuillez remplir tous les champs obligatoires");
-      return;
-    }
-
-    setLoading(true);
+  }
+  function navigate(target: number) {
+    if (ticket || saving) return;
+    if (target === 4) { void confirm(); return; }
+    if (target <= step || validate(target - 1)) { setStep(target); setErrors({}); }
+  }
+  async function confirm() {
+    if (saving || ticket) return;
+    if (!validate(3)) return;
+    if (!accepted) { setStep(3); setErrors({ accepted: "Confirmez avoir vérifié les informations du ticket." }); return; }
+    const parsed = bookingSchema.safeParse(form);
+    if (!parsed.success) return;
+    setSaving(true); setServerError("");
     try {
-      const newTicketId = "BSE-" + Date.now().toString().slice(-8);
-      
-      const { error } = await supabase
-        .from("reservations_dabo")
-        .insert({
-          ticket_id: newTicketId,
-          departure_city: formData.departure_city,
-          arrival_city: formData.arrival_city,
-          travel_date: formData.travel_date,
-          seat_number: formData.seat_number,
-          passenger_count: formData.passenger_count,
-          civility: formData.civility,
-          full_name: formData.full_name,
-          phone: formData.phone,
-          identity_document_type: formData.identity_document_type,
-          identity_document_number: formData.identity_document_number,
-          emergency_contact: formData.emergency_contact,
-          boarding_point: formData.boarding_point,
-          luggage_count: formData.luggage_count,
-          payment_method: formData.payment_method,
-        });
-
-      if (error) throw error;
-
-      // Add loyalty points
-      await addLoyaltyPoints(formData.phone, formData.full_name);
-
-      setTicketId(newTicketId);
-      setStep(4);
-      toast.success("Réservation confirmée !");
-    } catch (error) {
-      console.error(error);
-      toast.error("Erreur lors de la réservation");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const addLoyaltyPoints = async (phone: string, name: string) => {
-    try {
-      // Check if profile exists
-      const { data: profile } = await supabase
-        .from("loyalty_profiles")
-        .select("*")
-        .eq("phone", phone)
-        .single();
-
-      if (profile) {
-        // Update existing profile
-        await supabase
-          .from("loyalty_profiles")
-          .update({
-            points_balance: profile.points_balance + 1,
-            total_lifetime_points: profile.total_lifetime_points + 1,
-            full_name: name,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("phone", phone);
-
-        await supabase
-          .from("loyalty_transactions")
-          .insert({
-            phone,
-            points_change: 1,
-            type: "EARN_TICKET",
-            description: "Achat ticket de voyage",
-          });
-      } else {
-        // Create new profile
-        await supabase
-          .from("loyalty_profiles")
-          .insert({
-            phone,
-            full_name: name,
-            points_balance: 1,
-            total_lifetime_points: 1,
-          });
-
-        await supabase
-          .from("loyalty_transactions")
-          .insert({
-            phone,
-            points_change: 1,
-            type: "EARN_TICKET",
-            description: "Achat ticket de voyage",
-          });
+      const { data, error } = await supabase.functions.invoke("dabo-booking", { body: { action: "book", request_id: requestId.current, data: parsed.data } });
+      if (error) throw new Error("La réservation n’a pas pu être confirmée. Réessayez ; votre demande ne sera pas enregistrée en double.");
+      if (data?.error) {
+        if (data.code === "SEAT_TAKEN" || data.code === "INVALID_DATE") { setStep(1); setRefresh(value => value + 1); }
+        throw new Error(data.error);
       }
-    } catch (error) {
-      console.error("Error adding loyalty points:", error);
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      departure_city: "",
-      arrival_city: "",
-      travel_date: "",
-      seat_number: "",
-      passenger_count: 1,
-      civility: "M.",
-      full_name: "",
-      phone: "",
-      identity_document_type: "CNI",
-      identity_document_number: "",
-      emergency_contact: "",
-      boarding_point: "",
-      luggage_count: 0,
-      payment_method: "Wave",
-    });
-    setStep(1);
-    setTicketId(null);
-  };
-
-  const getStepClassName = (s: number) => {
-    if (s < step) return "bg-brand-yellow text-brand-blue";
-    if (s === step) return "bg-brand-blue text-white";
-    return "bg-gray-200 text-gray-500";
-  };
-
-  const getProgressClassName = (s: number) => {
-    if (s < step) return "bg-brand-yellow";
-    return "bg-gray-200";
-  };
+      if (!data?.ticket?.ticket_id) throw new Error("La confirmation n’a pas été reçue. Veuillez réessayer.");
+      setTicket(data.ticket); setStep(4); toast.success("Votre réservation est enregistrée. Le ticket est prêt !");
+    } catch (error) { const message = error instanceof Error ? error.message : "Une erreur est survenue. Réessayez."; setServerError(message); toast.error(message); }
+    finally { setSaving(false); }
+  }
+  const fieldError = (key: string) => errors[key] ? <p id={`${key}-error`} className="mt-1 text-xs text-red-700" role="alert">{errors[key]}</p> : null;
+  function textField(key: "full_name" | "phone" | "identity_document_number" | "emergency_contact" | "boarding_point", title: string, placeholder: string, type = "text", maxLength = 150) {
+    return <div className="space-y-2"><Label htmlFor={key} className="text-sm text-slate-700">{title} <span className="text-orange-700">*</span></Label><Input id={key} value={form[key]} onChange={event => update(key, event.target.value)} type={type} maxLength={maxLength} placeholder={placeholder} autoComplete={key === "full_name" ? "name" : key === "phone" ? "tel" : "off"} aria-invalid={Boolean(errors[key])} aria-describedby={errors[key] ? `${key}-error` : undefined} className={inputClass} />{fieldError(key)}</div>;
+  }
 
   return (
-    <div className="min-h-screen bg-[#FAFBFD]">
+    <div className="min-h-screen bg-[#FAFBFD] text-brand-navy">
       <TransportHeader back />
-
-      {/* Progress Steps */}
-      <div className="container mx-auto px-4 py-6">
-        <div className="flex items-center justify-center">
-          {[1, 2, 3, 4].map((s) => (
-            <div key={s} className="flex items-center">
-              <div className={"w-10 h-10 rounded-full flex items-center justify-center font-medium " + getStepClassName(s)}>
-                {s < step ? <CheckCircle className="h-5 w-5" /> : s}
-              </div>
-              {s < 4 && <div className={"w-16 h-1 mx-2 " + getProgressClassName(s)} />}
-            </div>
-          ))}
-        </div>
-        <div className="flex justify-center gap-3 mt-2 text-xs sm:text-sm text-gray-600">
-          <span className={step === 1 ? "font-bold text-brand-navy" : ""}>Trajet</span>
-          <span className={step === 2 ? "font-bold text-brand-navy" : ""}>Voyageur</span>
-          <span className={step === 3 ? "font-bold text-brand-navy" : ""}>Paiement</span>
-          <span className={step === 4 ? "font-bold text-brand-navy" : ""}>Confirmation</span>
-        </div>
-      </div>
-
-      <div className="container mx-auto px-4 pb-12 max-w-2xl">
-        {step === 1 && (
-          <Card className="card-transport">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <MapPin className="h-5 w-5 text-brand-blue" />
-                <span>Etape 1 : Choisir votre trajet</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="departure_city">Ville de depart *</Label>
-                  <Select value={formData.departure_city} onValueChange={(v) => handleChange({ target: { name: "departure_city", value: v } } as any)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selectionner" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CITIES.map(city => (
-                        <SelectItem key={city} value={city}>{city}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="arrival_city">Ville d'arrivée *</Label>
-                  <Select value={formData.arrival_city} onValueChange={(v) => handleChange({ target: { name: "arrival_city", value: v } } as any)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selectionner" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CITIES.filter(c => c !== formData.departure_city).map(city => (
-                        <SelectItem key={city} value={city}>{city}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="travel_date">Date de voyage *</Label>
-                <Input
-                  id="travel_date"
-                  type="date"
-                  name="travel_date"
-                  value={formData.travel_date}
-                  onChange={handleChange}
-                  min={new Date().toISOString().split("T")[0]}
-                />
-                {formData.departure_city && (
-                  <p className="text-sm text-gray-500 mt-1">
-                    Prochain depart {formData.departure_city} : {getNextTravelDate(formData.departure_city)}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="seat_number">Numero de siege *</Label>
-                <Select value={formData.seat_number} onValueChange={(v) => handleChange({ target: { name: "seat_number", value: v } } as any)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choisir un siege" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SEATS.map(seat => (
-                      <SelectItem key={seat} value={seat}>Siege {seat}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="passenger_count">Nombre de passagers</Label>
-                <Select value={formData.passenger_count.toString()} onValueChange={(v) => handleChange({ target: { name: "passenger_count", value: v } } as any)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="1" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[1,2,3,4,5].map(n => (
-                      <SelectItem key={n} value={n.toString()}>{n} passager{n > 1 ? "s" : ""}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex justify-end">
-                <Button onClick={() => setStep(2)} disabled={!validateStep()}>
-                  Suivant <ChevronRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {step === 2 && (
-          <Card className="card-transport">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <User className="h-5 w-5 text-brand-blue" />
-                <span>Etape 2 : Fiche de renseignements voyageur</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <Alert className="bg-blue-50 border-blue-200">
-                <AlertDescription className="text-blue-800">
-                  Aucune connexion Gmail/Google requise. Identification via cette fiche uniquement.
-                </AlertDescription>
-              </Alert>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Civilité *</Label>
-                  <RadioGroup value={formData.civility} onValueChange={(v) => handleRadioChange("civility", v)}>
-                    <div className="flex space-x-4">
-                      <label className="flex items-center space-x-2 cursor-pointer">
-                        <RadioGroupItem value="M." />
-                        <span>M.</span>
-                      </label>
-                      <label className="flex items-center space-x-2 cursor-pointer">
-                        <RadioGroupItem value="Mme" />
-                        <span>Mme</span>
-                      </label>
-                      <label className="flex items-center space-x-2 cursor-pointer">
-                        <RadioGroupItem value="Mlle" />
-                        <span>Mlle</span>
-                      </label>
-                    </div>
-                  </RadioGroup>
-                </div>
-                <div>
-                  <Label htmlFor="full_name">Nom complet *</Label>
-                  <Input id="full_name" name="full_name" value={formData.full_name} onChange={handleChange} placeholder="Nom et Prenom" />
-                </div>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="phone">Telephone *</Label>
-                  <Input id="phone" name="phone" type="tel" value={formData.phone} onChange={handleChange} placeholder="+221 7X XXX XX XX" />
-                </div>
-                <div>
-                  <Label htmlFor="identity_document_type">Piece d'identite *</Label>
-                  <Select value={formData.identity_document_type} onValueChange={(v) => handleChange({ target: { name: "identity_document_type", value: v } } as any)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="CNI">CNI</SelectItem>
-                      <SelectItem value="Passeport">Passeport</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="identity_document_number">Numero de la piece *</Label>
-                <Input id="identity_document_number" name="identity_document_number" value={formData.identity_document_number} onChange={handleChange} placeholder="Numero CNI ou Passeport" />
-              </div>
-
-              <div>
-                <Label htmlFor="emergency_contact">Contact d'urgence *</Label>
-                <Input id="emergency_contact" name="emergency_contact" type="tel" value={formData.emergency_contact} onChange={handleChange} placeholder="+221 7X XXX XX XX" />
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="boarding_point">Point de montee *</Label>
-                  <Input id="boarding_point" name="boarding_point" value={formData.boarding_point} onChange={handleChange} placeholder="Ex: Gare routiere Dakar" />
-                </div>
-                <div>
-                  <Label htmlFor="luggage_count">Nombre de bagages</Label>
-                  <Select value={formData.luggage_count.toString()} onValueChange={(v) => handleChange({ target: { name: "luggage_count", value: v } } as any)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="0" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[0,1,2,3,4,5].map(n => (
-                        <SelectItem key={n} value={n.toString()}>{n} bagage{n > 1 ? "s" : ""}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="flex justify-between">
-                <Button variant="outline" onClick={() => setStep(1)}>
-                  <ChevronRight className="mr-2 h-4 w-4 rotate-180" /> Precedent
-                </Button>
-                <Button onClick={() => setStep(3)} disabled={!validateStep()}>
-                  Suivant <ChevronRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {step === 3 && (
-          <Card className="card-transport">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <CreditCard className="h-5 w-5 text-brand-blue" />
-                <span>Etape 3 : Paiement</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="font-medium">Total a payer : <span className="text-brand-blue text-xl">{formData.passenger_count * 12000} FCFA</span></p>
-                <p className="text-sm text-gray-600">{formData.passenger_count} passager(s) x 12 000 FCFA</p>
-              </div>
-
-              <Label>Mode de paiement *</Label>
-              <RadioGroup value={formData.payment_method} onValueChange={(v) => handleRadioChange("payment_method", v)}>
-                <div className="space-y-3">
-                  {["Wave", "Orange Money", "Espces (Cash)"].map(method => (
-                    <label key={method} className="flex items-center space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
-                      <RadioGroupItem value={method} />
-                      <span className="font-medium">{method}</span>
-                    </label>
-                  ))}
-                </div>
-              </RadioGroup>
-
-              <div className="flex justify-between">
-                <Button variant="outline" onClick={() => setStep(2)}>
-                  <ChevronRight className="mr-2 h-4 w-4 rotate-180" /> Precedent
-                </Button>
-                <Button onClick={handleSubmit} disabled={loading || !validateStep()}>
-                  {loading ? "Traitement..." : "Confirmer et payer"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {step === 4 && ticketId && (
-          <Card className="card-transport">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2 text-green-600">
-                <CheckCircle className="h-5 w-5" />
-                <span>Réservation confirmée !</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-                <p className="text-2xl font-bold text-green-800">{ticketId}</p>
-                <p className="text-green-700">Votre ticket a été généré avec succès</p>
-              </div>
-
-              <div className="grid gap-4">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-brand-blue mb-2">Détails du voyage</h4>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <p><strong>Trajet :</strong> {formData.departure_city} - {formData.arrival_city}</p>
-                    <p><strong>Date :</strong> {formData.travel_date}</p>
-                    <p><strong>Siege :</strong> {formData.seat_number}</p>
-                    <p><strong>Passagers :</strong> {formData.passenger_count}</p>
-                    <p><strong>Paiement :</strong> {formData.payment_method}</p>
-                    <p><strong>Total :</strong> {formData.passenger_count * 12000} FCFA</p>
+      <main className="mx-auto max-w-4xl px-4 pb-12 pt-6 sm:px-6">
+        <nav aria-label="Étapes de réservation" className="mb-8 grid grid-cols-4 gap-2">
+          {stepNames.map((name, index) => <button key={name} type="button" onClick={() => navigate(index + 1)} disabled={saving || (Boolean(ticket) && index !== 3)} aria-current={step === index + 1 ? "step" : undefined} className={`flex flex-col items-center gap-2 rounded-2xl px-1 py-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange disabled:cursor-default sm:flex-row sm:justify-center sm:text-sm ${step === index + 1 ? "bg-brand-navy text-white" : index + 1 < step ? "bg-orange-50 text-brand-navy" : "bg-slate-100 text-slate-600 hover:bg-orange-50"}`}><span className={`flex h-8 w-8 items-center justify-center rounded-full ${step === index + 1 ? "bg-brand-orange text-brand-navy" : "bg-white text-brand-navy"}`}>{index + 1 < step ? <Check className="h-4 w-4" /> : index + 1}</span>{name}</button>)}
+        </nav>
+        {serverError && <div role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{serverError}</div>}
+        {ticket ? <TicketConfirmation ticket={ticket} onNewBooking={() => { setTicket(null); setForm(initial()); setStep(1); setErrors({}); setAccepted(false); setServerError(""); requestId.current = crypto.randomUUID(); setRefresh(value => value + 1); }} /> : (
+          <Card className="rounded-3xl border-slate-200 bg-white shadow-sm">
+            <CardHeader className="p-6 pb-3 sm:p-8 sm:pb-4"><CardTitle ref={headingRef} tabIndex={-1} className="flex items-center gap-3 text-xl font-extrabold outline-none sm:text-2xl">{step === 1 ? <MapPin className="text-orange-600" /> : step === 2 ? <UserRound className="text-orange-600" /> : <CreditCard className="text-orange-600" />}{step === 1 ? "Choisissez votre trajet" : step === 2 ? "Fiche de renseignements voyageur" : "Choisissez votre moyen de paiement"}</CardTitle><p className="pt-2 text-sm text-slate-600">{step === 1 ? "DABO TRANSPORT • 12 000 FCFA par personne" : step === 2 ? "Sans compte Google. Les champs marqués * sont obligatoires." : "Vérifiez votre voyage avant de générer le ticket."}</p></CardHeader>
+            <CardContent className="p-6 pt-4 sm:p-8 sm:pt-4">
+              <form noValidate onSubmit={event => { event.preventDefault(); if (step < 3) navigate(step + 1); else void confirm(); }}>
+                {step === 1 && <div className="space-y-5">
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <div className="space-y-2"><Label htmlFor="departure_city">Départ *</Label><Select value={form.departure_city} onValueChange={value => { update("departure_city", value); setForm(previous => ({ ...previous, arrival_city: previous.arrival_city === value ? value === "Dakar" ? "Ballou" : "Dakar" : previous.arrival_city, seats: previous.seats.map(() => "") })); }}><SelectTrigger id="departure_city" className={inputClass}><SelectValue /></SelectTrigger><SelectContent>{["Dakar", "Ballou"].map(city => <SelectItem key={city} value={city}>{city}</SelectItem>)}</SelectContent></Select>{fieldError("departure_city")}</div>
+                    <div className="space-y-2"><Label htmlFor="arrival_city">Arrivée *</Label><Select value={form.arrival_city} onValueChange={value => update("arrival_city", value)}><SelectTrigger id="arrival_city" className={inputClass}><SelectValue /></SelectTrigger><SelectContent>{cities.filter(city => city !== form.departure_city).map(city => <SelectItem key={city} value={city}>{city}</SelectItem>)}</SelectContent></Select>{fieldError("arrival_city")}</div>
+                    <div className="space-y-2"><Label htmlFor="travel_date">Date de voyage *</Label><Input id="travel_date" type="date" min={new Date().toISOString().slice(0,10)} value={form.travel_date} onChange={event => { update("travel_date", event.target.value); setForm(previous => ({ ...previous, seats: previous.seats.map(() => "") })); }} className={inputClass} aria-invalid={Boolean(errors.travel_date)} />{fieldError("travel_date")}<p className="text-xs text-slate-600">{form.departure_city === "Dakar" ? "Mardi & samedi" : "Lundi & jeudi"} à 15h00</p></div>
+                    <div className="space-y-2"><Label htmlFor="passengers">Nombre de passagers</Label><Select value={String(form.seats.length)} onValueChange={value => update("seats", Array.from({ length: Number(value) }, (_, index) => form.seats[index] || ""))}><SelectTrigger id="passengers" className={inputClass}><SelectValue /></SelectTrigger><SelectContent>{[1,2,3,4,5].map(n => <SelectItem key={n} value={String(n)}>{n} passager{n > 1 ? "s" : ""}</SelectItem>)}</SelectContent></Select></div>
                   </div>
-                </div>
-
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-brand-blue mb-2">Informations voyageur</h4>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <p><strong>Nom :</strong> {formData.civility} {formData.full_name}</p>
-                    <p><strong>Téléphone :</strong> {formData.phone}</p>
-                    <p><strong>Pièce :</strong> {formData.identity_document_type} {formData.identity_document_number}</p>
-                    <p><strong>Urgence :</strong> {formData.emergency_contact}</p>
-                    <p><strong>Montée :</strong> {formData.boarding_point}</p>
-                    <p><strong>Bagages :</strong> {formData.luggage_count}</p>
-                  </div>
-                </div>
-              </div>
-
-              <Alert className="bg-yellow-50 border-yellow-200">
-                <AlertDescription className="text-yellow-800">
-                  <strong>Important :</strong> Presentez-vous au point de montee 30 min avant le départ avec votre pièce d'identité et ce numéro de ticket : <strong>{ticketId}</strong>
-                </AlertDescription>
-              </Alert>
-
-              <div className="flex space-x-4">
-                <Button onClick={resetForm} className="flex-1">
-                  Nouvelle réservation
-                </Button>
-                <Button variant="outline" onClick={() => window.print()} className="flex-1">
-                  Imprimer le ticket
-                </Button>
-              </div>
+                  {checking && <p className="flex items-center gap-2 text-sm text-slate-600"><Loader2 className="h-4 w-4 animate-spin" /> Vérification des sièges…</p>}
+                  {availabilityError && <div className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{availabilityError}<Button type="button" variant="link" onClick={() => setRefresh(value => value + 1)} className="text-red-800">Réessayer</Button></div>}
+                  <div className="grid gap-4 sm:grid-cols-2">{form.seats.map((seat, index) => <div key={index} className="space-y-2"><Label htmlFor={`seat-${index}`}>Siège du passager {index + 1} *</Label><Select value={seat} disabled={!form.travel_date || checking || Boolean(availabilityError)} onValueChange={value => update("seats", form.seats.map((old, i) => i === index ? value : old))}><SelectTrigger id={`seat-${index}`} className={inputClass}><SelectValue placeholder="Choisir un siège" /></SelectTrigger><SelectContent>{Array.from({ length: 45 }, (_, i) => String(i + 1)).map(value => <SelectItem key={value} value={value} disabled={taken.includes(value) || form.seats.some((selected, i) => i !== index && selected === value)}>Siège {value}{taken.includes(value) ? " — réservé" : ""}</SelectItem>)}</SelectContent></Select>{fieldError(`seats.${index}`)}</div>)}</div>{fieldError("seats")}
+                  <div className="rounded-xl bg-slate-50 p-4 text-sm">Total du voyage : <strong className="ml-2 text-lg">{formatAmount(form.seats.length * 12000)}</strong><p className="mt-1 text-xs text-slate-500">Les sièges seront bloqués après confirmation.</p></div>
+                </div>}
+                {step === 2 && <div className="space-y-5">
+                  {form.seats.length > 1 && <p className="rounded-xl bg-blue-50 p-4 text-sm text-blue-900">Renseignez le voyageur principal pour cette réservation de {form.seats.length} personnes. Chaque passager devra présenter sa pièce d’identité à l’embarquement.</p>}
+                  <div className="grid gap-5 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="civility">Civilité *</Label><Select value={form.civility} onValueChange={value => update("civility", value as Draft["civility"])}><SelectTrigger id="civility" className={inputClass}><SelectValue /></SelectTrigger><SelectContent>{["M.", "Mme", "Mlle"].map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select></div>{textField("full_name", "Nom complet", "Nom et prénom", "text", 100)}{textField("phone", "Téléphone", "77 123 45 67", "tel", 25)}<div className="space-y-2"><Label htmlFor="identity_document_type">Pièce d’identité *</Label><Select value={form.identity_document_type} onValueChange={value => update("identity_document_type", value as Draft["identity_document_type"])}><SelectTrigger id="identity_document_type" className={inputClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="CNI">CNI</SelectItem><SelectItem value="Passeport">Passeport</SelectItem></SelectContent></Select></div>{textField("identity_document_number", "Numéro CNI / passeport", "Numéro de votre pièce", "text", 50)}{textField("emergency_contact", "Téléphone du contact d’urgence", "77 123 45 67", "tel", 25)}{textField("boarding_point", "Point de montée", "Gare / point de rendez-vous")}<div className="space-y-2"><Label htmlFor="luggage_count">Nombre de bagages</Label><Select value={String(form.luggage_count)} onValueChange={value => update("luggage_count", Number(value))}><SelectTrigger id="luggage_count" className={inputClass}><SelectValue /></SelectTrigger><SelectContent>{[0,1,2,3,4,5].map(n => <SelectItem key={n} value={String(n)}>{n} bagage{n > 1 ? "s" : ""}</SelectItem>)}</SelectContent></Select></div></div>
+                  <p className="text-xs leading-relaxed text-slate-500">La pièce d’identité et le contact d’urgence ne seront pas inclus dans le PDF ni dans le message WhatsApp.</p>
+                </div>}
+                {step === 3 && <div className="space-y-6">
+                  <RadioGroup aria-label="Mode de paiement" value={form.payment_method} onValueChange={value => update("payment_method", value as Draft["payment_method"])} className="gap-3">{[{ value: "Cash", subtitle: "Espèces auprès de la compagnie", icon: Banknote, color: "bg-orange-50 text-orange-700" }, { value: "Wave", subtitle: "Paiement mobile Wave", icon: Smartphone, color: "bg-sky-50 text-sky-700" }, { value: "OM", subtitle: "Orange Money", icon: CreditCard, color: "bg-green-50 text-green-700" }].map(({ value, subtitle, icon: Icon, color }) => <label key={value} className={`flex cursor-pointer items-center gap-4 rounded-2xl border p-4 transition-colors sm:p-5 ${form.payment_method === value ? "border-brand-orange bg-orange-50/40 ring-1 ring-brand-orange" : "border-slate-200 hover:border-orange-300"}`}><span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full ${color}`}><Icon className="h-7 w-7" /></span><span className="flex-1"><span className="block text-xl font-extrabold">{value}</span><span className="text-xs text-slate-600">{subtitle}</span></span><RadioGroupItem value={value} className="border-brand-orange text-orange-700" /></label>)}</RadioGroup>
+                  <div className="rounded-2xl bg-slate-50 p-5"><div className="mb-3 flex items-center justify-between"><h3 className="font-bold">Votre réservation</h3><Button variant="link" type="button" onClick={() => navigate(1)} className="h-auto p-0 text-orange-700">Modifier</Button></div><p className="font-semibold">{form.departure_city} → {form.arrival_city}</p><p className="mt-1 text-sm text-slate-600">{formatTravelDate(form.travel_date)} • 15h00</p><p className="mt-1 text-sm text-slate-600">{form.full_name} • Siège(s) {form.seats.join(", ")}</p><div className="mt-4 flex justify-between border-t border-slate-200 pt-3"><span>Total à régler</span><strong className="text-xl">{formatAmount(form.seats.length * 12000)}</strong></div></div>
+                  <p className="rounded-xl bg-orange-50 p-4 text-sm leading-relaxed text-orange-900">{form.payment_method === "Cash" ? "Le règlement en espèces est à effectuer auprès de DABO TRANSPORT avant l’embarquement." : `Le choix ${form.payment_method === "OM" ? "Orange Money" : "Wave"} sera enregistré. Aucun débit automatique n’est effectué ici : contactez la compagnie pour les instructions de règlement.`} Le ticket portera la mention « paiement en attente ».</p>
+                  <label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed"><Checkbox checked={accepted} onCheckedChange={value => { setAccepted(value === true); setErrors({}); }} className="mt-1 border-orange-500 data-[state=checked]:bg-brand-navy" /><span>J’ai vérifié les renseignements et je comprends que le paiement reste à effectuer.</span></label>{fieldError("accepted")}
+                </div>}
+                <div className="mt-8 flex items-center justify-between gap-3 border-t border-slate-100 pt-5">{step > 1 ? <Button type="button" variant="outline" disabled={saving} onClick={() => navigate(step - 1)} className="h-12 rounded-xl"><ArrowLeft /> Retour</Button> : <Button asChild variant="outline" className="h-12 rounded-xl"><Link to="/">Accueil</Link></Button>}<Button type="submit" disabled={saving || (step === 1 && checking)} className={actionClass}>{saving ? <Loader2 className="animate-spin" /> : step === 3 ? <CheckCircle2 /> : <ArrowRight />}{saving ? "Enregistrement…" : step === 3 ? "Confirmer le ticket" : "Continuer"}</Button></div>
+              </form>
             </CardContent>
           </Card>
         )}
-      </div>
-
-      {/* Footer */}
-      <footer className="bg-brand-blue text-white py-6 mt-12">
-        <div className="container mx-auto px-4 text-center text-sm opacity-80">
-          BALLOU SERVICE EXPRESS - DABO TRANSPORT © 2024
-        </div>
-      </footer>
+      </main>
     </div>
   );
 }
