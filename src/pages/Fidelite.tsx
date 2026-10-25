@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { lucideReact } from "lucide-react";
+import { Star } from "lucide-react";
 
 const REWARDS = [
   { id: 1, title: "Réduction 15% sur ticket", description: "Code promo unique -15% pour votre prochain achat", points: 10, unlocked: false, type: "discount" },
@@ -38,8 +38,6 @@ export default function Fidelite() {
   }, []);
 
   const fetchLoyaltyData = async () => {
-    // We need phone from user or use a default for demo
-    // In real app, this would come from auth/session
     const demoPhone = phone || "+221 7X XXX XX XX";
     
     setIsLoading(true);
@@ -56,7 +54,6 @@ export default function Fidelite() {
         setPointsBalance(profile.points_balance);
         setTotalLifetimePoints(profile.total_lifetime_points);
       } else {
-        // Create default profile
         await supabase.from("loyalty_profiles").insert({
           phone: demoPhone,
           full_name: fullName || "Voyageur",
@@ -67,7 +64,6 @@ export default function Fidelite() {
         setTotalLifetimePoints(0);
       }
 
-      // Fetch transactions
       const { data: tx, error: txError } = await supabase
         .from("loyalty_transactions")
         .select("*")
@@ -97,34 +93,25 @@ export default function Fidelite() {
     if (!reward) return;
 
     if (pointsBalance >= 10) {
-      // Check if already unlocked
-      const alreadyUnlocked = REWARDS.some(r => r.id !== rewardId && r.unlocked);
-      
-      // Mark as unlocked and deduct points
       REWARDS[rewardId - 1].unlocked = true;
       setPointsBalance(pointsBalance - 10);
       
-      // Record transaction
       supabase.from("loyalty_transactions").insert({
         phone,
         points_change: -10,
         type: "REDEEM_DISCOUNT",
-        description: `${reward.title} - ${new Date().toLocaleDateString()}`,
+        description: reward.title + " - " + new Date().toLocaleDateString(),
       });
 
-      // Handle specific reward types
       if (reward.id === 1) {
-        // Discount - generate code
         setTimeout(() => {
-          toast.success(`Félicitations ! Code réduction -15% généré : BALLOU${Math.random().toString(36).slice(2, 8).toUpperCase()}`);
+          toast.success("Félicitations ! Code réduction -15% généré : BALLOU" + Math.random().toString(36).slice(2, 8).toUpperCase());
         }, 500);
       } else if (reward.id === 2) {
-        // Gift card
         setTimeout(() => {
-          toast.success(`Félicitations ! Code carte cadeau généré : GC-BALLOU${Math.random().toString(36).slice(2, 8).toUpperCase()}`);
+          toast.success("Félicitations ! Code carte cadeau généré : GC-BALLOU" + Math.random().toString(36).slice(2, 8).toUpperCase());
         }, 500);
       } else if (reward.id === 5) {
-        // Continue accumulating
         setTimeout(() => {
           toast.success("Points conservés ! Vous pouvez continuer à accumuler.");
         }, 500);
@@ -133,7 +120,7 @@ export default function Fidelite() {
       setShowRewardPanel(false);
       setSelectedReward(null);
     } else {
-      toast.error(`Vous avez besoin de 10 points (actuel: ${pointsBalance}/10)`);
+      toast.error("Vous avez besoin de 10 points (actuel: " + pointsBalance + "/10)");
     }
   };
 
@@ -176,7 +163,6 @@ export default function Fidelite() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-brand-blue text-white shadow-lg">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -194,9 +180,7 @@ export default function Fidelite() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        {/* Points Balance Section */}
         <div className="card-transport mb-8 p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -205,8 +189,8 @@ export default function Fidelite() {
             </div>
             <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
               <div 
-                className={`h-full ${getProgressColor()} rounded-full transition-all duration-500 ease-out`}
-                style={{ width: `${getProgressPercent()}%` }}
+                className={getProgressColor() + " h-full rounded-full transition-all duration-500 ease-out"}
+                style={{ width: getProgressPercent() + "%" }}
               />
             </div>
             <p className="text-sm text-gray-500">
@@ -227,7 +211,6 @@ export default function Fidelite() {
           )}
         </div>
 
-        {/* Rewards Section */}
         <div className="card-transport mb-8 p-6">
           <h3 className="text-xl font-bold text-brand-blue mb-6">
             {pointsBalance >= 10 ? "Vos récompenses disponibles" : "Programme de fidélité"}
@@ -263,7 +246,7 @@ export default function Fidelite() {
           {pointsBalance >= 10 && (
             <div className="space-y-4">
               {REWARDS.map(reward => (
-                <div key={reward.id} className={`p-4 rounded-lg border ${reward.unlocked ? "border-green-500 bg-green-50" : "border-gray-300"} transition-colors cursor-pointer ${!reward.unlocked && pointsBalance < 10 ? "opacity-50 cursor-not-allowed" : ""}`}>
+                <div key={reward.id} className={"p-4 rounded-lg border " + (reward.unlocked ? "border-green-500 bg-green-50" : "border-gray-300") + " transition-colors cursor-pointer " + (!reward.unlocked && pointsBalance < 10 ? "opacity-50 cursor-not-allowed" : "")}>
                   <div className="flex items-center space-x-3 mb-3">
                     <span className="text-2xl">{reward.id === 1 ? "🎫" : reward.id === 2 ? "🎁" : reward.id === 3 ? "📱" : "🌐"}</span>
                     <div>
@@ -299,7 +282,6 @@ export default function Fidelite() {
           )}
         </div>
 
-        {/* Transaction History */}
         <div className="card-transport p-6">
           <h3 className="text-xl font-bold text-brand-blue mb-6">
             Historique des transactions
@@ -329,7 +311,7 @@ export default function Fidelite() {
                     </td>
                     <td className="p-3 text-sm text-gray-600">{tx.description || "N/A"}</td>
                     <td className="p-3 text-sm font-medium">
-                      {tx.points_change > 0 ? `+${tx.points_change}` : tx.points_change < 0 ? `${tx.points_change}` : "0"}
+                      {tx.points_change > 0 ? "+" + tx.points_change : tx.points_change < 0 ? tx.points_change.toString() : "0"}
                     </td>
                     <td className="p-3 text-sm text-gray-500">{new Date(tx.created_at).toLocaleDateString()}</td>
                   </tr>
@@ -339,10 +321,9 @@ export default function Fidelite() {
           </div>
         </div>
 
-        {/* Request Reward Modal */}
         {showRewardPanel && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-            <div className="bg-white rounded-xl p-8 max-w-md w-full shadow-2xl">
+            <div className="bg-white rounded-xl p-8 max-w-md w-full shadow-2xl relative">
               <h3 className="text-2xl font-bold text-brand-blue mb-6">
                 {pointsBalance >= 10 ? "Choisissez votre récompense" : "Prochain palier"}
               </h3>
@@ -361,7 +342,7 @@ export default function Fidelite() {
               {pointsBalance >= 10 && (
                 <div className="space-y-4">
                   {REWARDS.map(reward => (
-                    <div key={reward.id} className="p-4 rounded-lg border {reward.unlocked ? "border-green-500 bg-green-50 opacity-80" : "border-gray-300"} cursor-pointer hover:border-brand-yellow transition-colors">
+                    <div key={reward.id} className={"p-4 rounded-lg border " + (reward.unlocked ? "border-green-500 bg-green-50 opacity-80" : "border-gray-300") + " cursor-pointer hover:border-brand-yellow transition-colors"}>
                       <div className="flex items-center space-x-3 mb-3">
                         <span className="text-2xl">{reward.id === 1 ? "🎫" : reward.id === 2 ? "🎁" : reward.id === 3 ? "📱" : "🌐"}</span>
                         <div>
@@ -381,8 +362,8 @@ export default function Fidelite() {
                           onClick={() => setSelectedReward(reward.id)}
                           className="mt-2 text-brand-blue text-sm hover:underline flex items-center space-x-1"
                         >
-                          <span className="iconify" icon="lucide:check" />
-                          Sélectionner
+                          <span>✓</span>
+                          <span>Sélectionner</span>
                         </button>
                       )}
                     </div>
@@ -431,7 +412,6 @@ export default function Fidelite() {
         )}
       </main>
 
-      {/* Footer */}
       <footer className="bg-brand-blue text-white py-6 mt-12">
         <div className="container mx-auto px-4 text-center text-sm opacity-80">
           BALLOU SERVICE EXPRESS - DABO TRANSPORT © 2024

@@ -86,11 +86,19 @@
 }
 
 .btn-transport-primary {
-  @apply bg-brand-blue text-white hover:bg-blue-800 focus-visible:ring-brand-blue;
+  @apply bg-brand-blue text-white hover:bg-blue-800 focus-visible:ring-2 focus-visible:ring-brand-blue;
 }
 
 .btn-transport-secondary {
-  @apply bg-brand-yellow text-brand-blue hover:bg-yellow-500 focus-visible:ring-brand-yellow;
+  @apply bg-brand-yellow text-brand-blue hover:bg-yellow-500 focus-visible:ring-2 focus-visible:ring-brand-yellow;
+}
+
+.ring-brand-blue {
+  --tw-ring-color: #003366;
+}
+
+.ring-brand-yellow {
+  --tw-ring-color: #FFC107;
 }
 
 /* Card styles */

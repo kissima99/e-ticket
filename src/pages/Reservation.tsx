@@ -68,7 +68,7 @@ export default function Reservation() {
       checkDate.setDate(today.getDate() + i);
       const dayName = dayNames[checkDate.getDay()];
       if (days.includes(dayName)) {
-        return checkDate.toISOString().split('T')[0];
+        return checkDate.toISOString().split("T")[0];
       }
     }
     return "";
@@ -98,7 +98,7 @@ export default function Reservation() {
 
     setLoading(true);
     try {
-      const newTicketId = `BSE-${Date.now().toString().slice(-8)}`;
+      const newTicketId = "BSE-" + Date.now().toString().slice(-8);
       
       const { error } = await supabase
         .from("reservations_dabo")
@@ -211,6 +211,17 @@ export default function Reservation() {
     setTicketId(null);
   };
 
+  const getStepClassName = (s: number) => {
+    if (s < step) return "bg-brand-yellow text-brand-blue";
+    if (s === step) return "bg-brand-blue text-white";
+    return "bg-gray-200 text-gray-500";
+  };
+
+  const getProgressClassName = (s: number) => {
+    if (s < step) return "bg-brand-yellow";
+    return "bg-gray-200";
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -236,13 +247,10 @@ export default function Reservation() {
         <div className="flex items-center justify-center">
           {[1, 2, 3, 4].map((s) => (
             <div key={s} className="flex items-center">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-medium ${
-                s < step ? "bg-brand-yellow text-brand-blue" : 
-                s === step ? "bg-brand-blue text-white" : "bg-gray-200 text-gray-500"
-              }`}>
+              <div className={"w-10 h-10 rounded-full flex items-center justify-center font-medium " + getStepClassName(s)}>
                 {s < step ? <CheckCircle className="h-5 w-5" /> : s}
               </div>
-              {s < 4 && <div className={`w-16 h-1 mx-2 ${s < step ? "bg-brand-yellow" : "bg-gray-200"}`} />}
+              {s < 4 && <div className={"w-16 h-1 mx-2 " + getProgressClassName(s)} />}
             </div>
           ))}
         </div>
@@ -260,16 +268,16 @@ export default function Reservation() {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <MapPin className="h-5 w-5 text-brand-blue" />
-                <span>Étape 1 : Choisir votre trajet</span>
+                <span>Etape 1 : Choisir votre trajet</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="departure_city">Ville de départ *</Label>
+                  <Label htmlFor="departure_city">Ville de depart *</Label>
                   <Select value={formData.departure_city} onValueChange={(v) => handleChange({ target: { name: "departure_city", value: v } } as any)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner" />
+                      <SelectValue placeholder="Selectionner" />
                     </SelectTrigger>
                     <SelectContent>
                       {CITIES.map(city => (
@@ -282,7 +290,7 @@ export default function Reservation() {
                   <Label htmlFor="arrival_city">Ville d'arrivée *</Label>
                   <Select value={formData.arrival_city} onValueChange={(v) => handleChange({ target: { name: "arrival_city", value: v } } as any)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner" />
+                      <SelectValue placeholder="Selectionner" />
                     </SelectTrigger>
                     <SelectContent>
                       {CITIES.filter(c => c !== formData.departure_city).map(city => (
@@ -301,24 +309,24 @@ export default function Reservation() {
                   name="travel_date"
                   value={formData.travel_date}
                   onChange={handleChange}
-                  min={new Date().toISOString().split('T')[0]}
+                  min={new Date().toISOString().split("T")[0]}
                 />
                 {formData.departure_city && (
                   <p className="text-sm text-gray-500 mt-1">
-                    Prochain départ {formData.departure_city} : {getNextTravelDate(formData.departure_city)}
+                    Prochain depart {formData.departure_city} : {getNextTravelDate(formData.departure_city)}
                   </p>
                 )}
               </div>
 
               <div>
-                <Label htmlFor="seat_number">Numéro de siège *</Label>
+                <Label htmlFor="seat_number">Numero de siege *</Label>
                 <Select value={formData.seat_number} onValueChange={(v) => handleChange({ target: { name: "seat_number", value: v } } as any)}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Choisir un siège" />
+                    <SelectValue placeholder="Choisir un siege" />
                   </SelectTrigger>
                   <SelectContent>
                     {SEATS.map(seat => (
-                      <SelectItem key={seat} value={seat}>Siège {seat}</SelectItem>
+                      <SelectItem key={seat} value={seat}>Siege {seat}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -332,7 +340,7 @@ export default function Reservation() {
                   </SelectTrigger>
                   <SelectContent>
                     {[1,2,3,4,5].map(n => (
-                      <SelectItem key={n} value={n.toString()}>{n} passager{n > 1 ? 's' : ''}</SelectItem>
+                      <SelectItem key={n} value={n.toString()}>{n} passager{n > 1 ? "s" : ""}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -352,7 +360,7 @@ export default function Reservation() {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <User className="h-5 w-5 text-brand-blue" />
-                <span>Étape 2 : Fiche de renseignements voyageur</span>
+                <span>Etape 2 : Fiche de renseignements voyageur</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -384,17 +392,17 @@ export default function Reservation() {
                 </div>
                 <div>
                   <Label htmlFor="full_name">Nom complet *</Label>
-                  <Input id="full_name" name="full_name" value={formData.full_name} onChange={handleChange} placeholder="Nom et Prénom" />
+                  <Input id="full_name" name="full_name" value={formData.full_name} onChange={handleChange} placeholder="Nom et Prenom" />
                 </div>
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="phone">Téléphone *</Label>
+                  <Label htmlFor="phone">Telephone *</Label>
                   <Input id="phone" name="phone" type="tel" value={formData.phone} onChange={handleChange} placeholder="+221 7X XXX XX XX" />
                 </div>
                 <div>
-                  <Label htmlFor="identity_document_type">Pièce d'identité *</Label>
+                  <Label htmlFor="identity_document_type">Piece d'identite *</Label>
                   <Select value={formData.identity_document_type} onValueChange={(v) => handleChange({ target: { name: "identity_document_type", value: v } } as any)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Type" />
@@ -408,8 +416,8 @@ export default function Reservation() {
               </div>
 
               <div>
-                <Label htmlFor="identity_document_number">Numéro de la pièce *</Label>
-                <Input id="identity_document_number" name="identity_document_number" value={formData.identity_document_number} onChange={handleChange} placeholder="Numéro CNI ou Passeport" />
+                <Label htmlFor="identity_document_number">Numero de la piece *</Label>
+                <Input id="identity_document_number" name="identity_document_number" value={formData.identity_document_number} onChange={handleChange} placeholder="Numero CNI ou Passeport" />
               </div>
 
               <div>
@@ -419,8 +427,8 @@ export default function Reservation() {
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="boarding_point">Point de montée *</Label>
-                  <Input id="boarding_point" name="boarding_point" value={formData.boarding_point} onChange={handleChange} placeholder="Ex: Gare routière Dakar" />
+                  <Label htmlFor="boarding_point">Point de montee *</Label>
+                  <Input id="boarding_point" name="boarding_point" value={formData.boarding_point} onChange={handleChange} placeholder="Ex: Gare routiere Dakar" />
                 </div>
                 <div>
                   <Label htmlFor="luggage_count">Nombre de bagages</Label>
@@ -430,7 +438,7 @@ export default function Reservation() {
                     </SelectTrigger>
                     <SelectContent>
                       {[0,1,2,3,4,5].map(n => (
-                        <SelectItem key={n} value={n.toString()}>{n} bagage{n > 1 ? 's' : ''}</SelectItem>
+                        <SelectItem key={n} value={n.toString()}>{n} bagage{n > 1 ? "s" : ""}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -439,7 +447,7 @@ export default function Reservation() {
 
               <div className="flex justify-between">
                 <Button variant="outline" onClick={() => setStep(1)}>
-                  <ChevronRight className="mr-2 h-4 w-4 rotate-180" /> Précédent
+                  <ChevronRight className="mr-2 h-4 w-4 rotate-180" /> Precedent
                 </Button>
                 <Button onClick={() => setStep(3)} disabled={!validateStep()}>
                   Suivant <ChevronRight className="ml-2 h-4 w-4" />
@@ -454,19 +462,19 @@ export default function Reservation() {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <CreditCard className="h-5 w-5 text-brand-blue" />
-                <span>Étape 3 : Paiement</span>
+                <span>Etape 3 : Paiement</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="font-medium">Total à payer : <span className="text-brand-blue text-xl">{formData.passenger_count * 12000} FCFA</span></p>
-                <p className="text-sm text-gray-600">{formData.passenger_count} passager(s) × 12 000 FCFA</p>
+                <p className="font-medium">Total a payer : <span className="text-brand-blue text-xl">{formData.passenger_count * 12000} FCFA</span></p>
+                <p className="text-sm text-gray-600">{formData.passenger_count} passager(s) x 12 000 FCFA</p>
               </div>
 
               <Label>Mode de paiement *</Label>
               <RadioGroup value={formData.payment_method} onValueChange={(v) => handleRadioChange("payment_method", v)}>
                 <div className="space-y-3">
-                  {["Wave", "Orange Money", "Espèces (Cash)"].map(method => (
+                  {["Wave", "Orange Money", "Espces (Cash)"].map(method => (
                     <label key={method} className="flex items-center space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
                       <RadioGroupItem value={method} />
                       <span className="font-medium">{method}</span>
@@ -477,7 +485,7 @@ export default function Reservation() {
 
               <div className="flex justify-between">
                 <Button variant="outline" onClick={() => setStep(2)}>
-                  <ChevronRight className="mr-2 h-4 w-4 rotate-180" /> Précédent
+                  <ChevronRight className="mr-2 h-4 w-4 rotate-180" /> Precedent
                 </Button>
                 <Button onClick={handleSubmit} disabled={loading || !validateStep()}>
                   {loading ? "Traitement..." : "Confirmer et payer"}
@@ -505,9 +513,9 @@ export default function Reservation() {
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <h4 className="font-medium text-brand-blue mb-2">Détails du voyage</h4>
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <p><strong>Trajet :</strong> {formData.departure_city} → {formData.arrival_city}</p>
+                    <p><strong>Trajet :</strong> {formData.departure_city} - {formData.arrival_city}</p>
                     <p><strong>Date :</strong> {formData.travel_date}</p>
-                    <p><strong>Siège :</strong> {formData.seat_number}</p>
+                    <p><strong>Siege :</strong> {formData.seat_number}</p>
                     <p><strong>Passagers :</strong> {formData.passenger_count}</p>
                     <p><strong>Paiement :</strong> {formData.payment_method}</p>
                     <p><strong>Total :</strong> {formData.passenger_count * 12000} FCFA</p>
@@ -529,7 +537,7 @@ export default function Reservation() {
 
               <Alert className="bg-yellow-50 border-yellow-200">
                 <AlertDescription className="text-yellow-800">
-                  <strong>Important :</strong> Présentez-vous au point de montée 30 min avant le départ avec votre pièce d'identité et ce numéro de ticket : <strong>{ticketId}</strong>
+                  <strong>Important :</strong> Presentez-vous au point de montee 30 min avant le départ avec votre pièce d'identité et ce numéro de ticket : <strong>{ticketId}</strong>
                 </AlertDescription>
               </Alert>
 
