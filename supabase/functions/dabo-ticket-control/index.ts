@@ -1,9 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { z } from "https://esm.sh/zod@3.25.76";
 
-const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
+const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-agent-session", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const schema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("login"), code: z.string().regex(/^\d{4}$/) }),
   z.object({ action: z.literal("access") }),
+  z.object({ action: z.literal("logout") }),
   z.object({ action: z.literal("list"), page: z.number().int().min(0).max(100000), status: z.enum(["ALL", "PAID", "PENDING"]), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")), departure: z.enum(["ALL", "Dakar", "Ballou"]) }),
   z.object({ action: z.literal("confirm"), reservation_id: z.string().uuid() }),
 ]);
@@ -13,33 +15,43 @@ Deno.serve(async req => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return reply({ error: "Méthode non autorisée." }, 405);
   try {
-    const header = req.headers.get("Authorization");
-    const token = header?.match(/^Bearer\s+(.+)$/i)?.[1];
-    if (!token) return reply({ error: "Connexion agent requise." }, 401);
-    const client = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false, autoRefreshToken: false } });
-    const { data: auth, error: authError } = await client.auth.getUser(token);
-    if (authError || !auth.user?.phone || !auth.user.phone_confirmed_at) return reply({ error: "Connectez-vous avec un téléphone vérifié par SMS." }, 401);
-    const phone = `+${auth.user.phone.replace(/^\+/, "")}`;
-    const { data: agent, error: agentError } = await client.from("ticket_agents").select("phone").eq("phone", phone).eq("active", true).maybeSingle();
-    if (agentError) throw agentError;
-    if (!agent) return reply({ error: "Ce numéro n’est pas autorisé à contrôler les tickets." }, 403);
-
     const raw = await req.text();
     if (raw.length > 2000) return reply({ error: "Requête trop volumineuse." }, 413);
     let input;
     try { input = schema.safeParse(JSON.parse(raw)); } catch { return reply({ error: "Requête invalide." }, 400); }
     if (!input.success) return reply({ error: "Paramètres invalides." }, 400);
     const request = input.data;
-    if (request.action === "access") return reply({ allowed: true, phone });
+    const client = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false, autoRefreshToken: false } });
+    if (request.action === "login") {
+      const { data, error } = await client.rpc("create_dabo_agent_session", { p_code: request.code });
+      if (error) throw error;
+      if (data.error) return reply(data, data.code === "RATE_LIMITED" ? 429 : 401);
+      return reply(data);
+    }
+
+    // L’accès agent utilise un jeton opaque vérifié en base, pas le JWT Supabase du navigateur.
+    const token = req.headers.get("x-agent-session");
+    if (!token || !/^[0-9a-f]{64}$/.test(token)) return reply({ error: "Connexion agent requise.", code: "SESSION_EXPIRED" }, 401);
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+    const hash = Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, "0")).join("");
+    const { data: session, error: sessionError } = await client.from("ticket_agent_sessions").select("id,expires_at").eq("token_hash", hash).eq("revoked", false).gt("expires_at", new Date().toISOString()).maybeSingle();
+    if (sessionError) throw sessionError;
+    if (!session) return reply({ error: "Votre session a expiré. Connectez-vous à nouveau.", code: "SESSION_EXPIRED" }, 401);
+    if (request.action === "access") return reply({ allowed: true, label: "Agent — code partagé", expires_at: session.expires_at });
+    if (request.action === "logout") {
+      const { error } = await client.from("ticket_agent_sessions").update({ revoked: true }).eq("id", session.id);
+      if (error) throw error;
+      return reply({ signed_out: true });
+    }
     if (request.action === "confirm") {
-      const { data, error } = await client.rpc("confirm_dabo_ticket_payment", { p_reservation: request.reservation_id, p_actor: auth.user.id, p_phone: phone });
+      const { data, error } = await client.rpc("confirm_dabo_ticket_payment", { p_reservation: request.reservation_id, p_agent_session: session.id });
       if (error) {
-        if (error.message.includes("AGENT_ACCESS_DENIED")) return reply({ error: "Accès agent refusé." }, 403);
+        if (error.message.includes("AGENT_ACCESS_DENIED")) return reply({ error: "Session agent invalide.", code: "SESSION_EXPIRED" }, 401);
         if (error.message.includes("TICKET_NOT_FOUND")) return reply({ error: "Ticket introuvable." }, 404);
         if (error.message.includes("INVALID_PAYMENT_STATUS")) return reply({ error: "Ce statut de paiement ne peut pas être confirmé." }, 409);
         throw error;
       }
-      console.info("[dabo-ticket-control] Payment confirmation recorded", { reservation_id: request.reservation_id, actor_id: auth.user.id, already_paid: data.already_paid });
+      console.info("[dabo-ticket-control] Payment confirmation recorded", { reservation_id: request.reservation_id, agent_session_id: session.id, already_paid: data.already_paid });
       return reply(data);
     }
     let query = client.from("reservations_dabo").select("id,ticket_id,created_at,full_name,departure_city,arrival_city,travel_date,seat_number,passenger_count,payment_status,payment_method,total_amount,verification_token", { count: "exact" });

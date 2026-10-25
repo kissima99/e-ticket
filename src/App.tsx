@@ -9,7 +9,7 @@ import Fidelite from "./pages/Fidelite";
 import TicketVerification from "./pages/TicketVerification";
 import AgentLogin from "./pages/AgentLogin";
 import TicketControl from "./pages/TicketControl";
-import { SessionContextProvider } from "./contexts/SessionContext";
+import { AgentSessionProvider } from "./contexts/AgentSessionContext";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -19,7 +19,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <SessionContextProvider>
+      <AgentSessionProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
@@ -31,7 +31,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
-      </SessionContextProvider>
+      </AgentSessionProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

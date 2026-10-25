@@ -17,14 +17,19 @@ export type ControlledTicket = {
 };
 export type TicketFilters = { status: "ALL" | "PAID" | "PENDING"; date: string; departure: "ALL" | "Dakar" | "Ballou" };
 
-type Request = { action: "access" } | ({ action: "list"; page: number } & TicketFilters) | { action: "confirm"; reservation_id: string };
-export async function ticketControlRequest<T>(request: Request): Promise<T> {
-  const { data, error } = await supabase.functions.invoke("dabo-ticket-control", { body: request });
+export type AgentSession = { token: string; expires_at: string };
+export class AgentSessionExpiredError extends Error {}
+
+type Request = { action: "login"; code: string } | { action: "access" | "logout" } | ({ action: "list"; page: number } & TicketFilters) | { action: "confirm"; reservation_id: string };
+export async function ticketControlRequest<T>(request: Request, token?: string): Promise<T> {
+  const { data, error } = await supabase.functions.invoke("dabo-ticket-control", { body: request, headers: token ? { "x-agent-session": token } : {} });
   if (error) {
     let message = "Impossible de joindre le contrôle des tickets. Vérifiez votre connexion.";
+    let code = "";
     if (error.context instanceof Response) {
-      try { const body = await error.context.json(); if (typeof body.error === "string") message = body.error; } catch { /* Une réponse réseau peut ne pas contenir de JSON. */ }
+      try { const body = await error.context.json(); if (typeof body.error === "string") message = body.error; if (typeof body.code === "string") code = body.code; } catch { /* Une réponse réseau peut ne pas contenir de JSON. */ }
     }
+    if (code === "SESSION_EXPIRED") throw new AgentSessionExpiredError(message);
     throw new Error(message);
   }
   if (data?.error) throw new Error(data.error);

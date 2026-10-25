@@ -10,18 +10,17 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { toast } from "sonner";
 import TransportHeader from "@/components/TransportHeader";
 import TicketQr from "@/components/TicketQr";
-import { useSession } from "@/contexts/SessionContext";
-import { supabase } from "@/integrations/supabase/client";
+import { useAgentSession } from "@/contexts/AgentSessionContext";
 import { formatAmount, formatTravelDate } from "@/lib/booking";
-import { ticketControlRequest, type ControlledTicket, type TicketFilters } from "@/lib/ticket-control";
+import { AgentSessionExpiredError, ticketControlRequest, type ControlledTicket, type TicketFilters } from "@/lib/ticket-control";
 
 export default function TicketControl() {
-  const { session, loading: sessionLoading } = useSession();
+  const { session, logout, clearSession } = useAgentSession();
   const [authorized, setAuthorized] = useState(false);
   const [authorizing, setAuthorizing] = useState(true);
   const [accessError, setAccessError] = useState("");
   const [accessRetry, setAccessRetry] = useState(0);
-  const [agentPhone, setAgentPhone] = useState("");
+  const [agentLabel, setAgentLabel] = useState("");
   const [tickets, setTickets] = useState<ControlledTicket[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -40,47 +39,46 @@ export default function TicketControl() {
     if (!session) return;
     let active = true;
     setAuthorized(false); setAuthorizing(true); setAccessError(""); setTickets([]); setQrTicket(null); setPaymentTicket(null);
-    ticketControlRequest<{ allowed: boolean; phone: string }>({ action: "access" }).then(data => {
+    ticketControlRequest<{ allowed: boolean; label: string }>({ action: "access" }, session.token).then(data => {
       if (!active) return;
       if (!data.allowed) throw new Error("Accès agent refusé.");
-      setAgentPhone(data.phone); setAuthorized(true);
-    }).catch(err => { if (active) setAccessError(err instanceof Error ? err.message : "Accès agent indisponible."); }).finally(() => { if (active) setAuthorizing(false); });
+      setAgentLabel(data.label); setAuthorized(true);
+    }).catch(err => { if (active) { if (err instanceof AgentSessionExpiredError) clearSession(); setAccessError(err instanceof Error ? err.message : "Accès agent indisponible."); } }).finally(() => { if (active) setAuthorizing(false); });
     return () => { active = false; };
-  }, [session?.access_token, accessRetry]);
+  }, [session?.token, accessRetry]);
 
   useEffect(() => {
-    if (!authorized) return;
+    if (!authorized || !session) return;
     let active = true;
     setLoading(true); setError(""); setTickets([]);
-    ticketControlRequest<{ tickets: ControlledTicket[]; total: number }>({ action: "list", page, ...filters }).then(data => {
+    ticketControlRequest<{ tickets: ControlledTicket[]; total: number }>({ action: "list", page, ...filters }, session.token).then(data => {
       if (!active) return;
       if (!Array.isArray(data.tickets) || typeof data.total !== "number") throw new Error("Réponse du serveur invalide.");
       if (page > 0 && page * 25 >= data.total) { setPage(Math.max(0, Math.ceil(data.total / 25) - 1)); return; }
       setTickets(data.tickets); setTotal(data.total);
-    }).catch(err => { if (active) { setTotal(0); setError(err instanceof Error ? err.message : "Chargement impossible."); } }).finally(() => { if (active) setLoading(false); });
+    }).catch(err => { if (active) { if (err instanceof AgentSessionExpiredError) clearSession(); setTotal(0); setError(err instanceof Error ? err.message : "Chargement impossible."); } }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [authorized, page, filters, refresh]);
+  }, [authorized, session?.token, page, filters, refresh]);
 
   function updateFilters(next: Partial<TicketFilters>) { setFilters(previous => ({ ...previous, ...next })); setPage(0); }
   async function signOut() {
     setSigningOut(true);
-    const { error } = await supabase.auth.signOut();
-    if (error) toast.error("Déconnexion impossible. Réessayez.");
-    setSigningOut(false);
+    try { await logout(); }
+    catch { toast.error("Déconnexion impossible. Réessayez."); }
+    finally { setSigningOut(false); }
   }
   async function confirmPayment() {
-    if (!paymentTicket || !accepted || confirming) return;
+    if (!paymentTicket || !accepted || confirming || !session) return;
     setConfirming(true); setConfirmationError("");
     try {
-      const data = await ticketControlRequest<{ confirmed: boolean; already_paid: boolean }>({ action: "confirm", reservation_id: paymentTicket.id });
+      const data = await ticketControlRequest<{ confirmed: boolean; already_paid: boolean }>({ action: "confirm", reservation_id: paymentTicket.id }, session.token);
       if (!data.confirmed) throw new Error("Confirmation non reçue. Réessayez : un même ticket ne sera confirmé qu’une fois.");
       setPaymentTicket(null); setAccepted(false); setRefresh(value => value + 1);
       toast.success(data.already_paid ? "Le paiement était déjà confirmé." : "Paiement confirmé et enregistré dans l’historique.");
-    } catch (err) { setConfirmationError(err instanceof Error ? err.message : "Confirmation impossible."); }
+    } catch (err) { if (err instanceof AgentSessionExpiredError) clearSession(); setConfirmationError(err instanceof Error ? err.message : "Confirmation impossible."); }
     finally { setConfirming(false); }
   }
 
-  if (sessionLoading) return <div role="status" className="flex min-h-screen items-center justify-center gap-3 text-brand-navy"><Loader2 className="animate-spin" /> Chargement de la session…</div>;
   if (!session) return <Navigate to="/agent/connexion" replace />;
 
   return (
@@ -88,7 +86,7 @@ export default function TicketControl() {
       <TransportHeader back />
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         <div className="mb-7 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3"><ShieldCheck className="h-9 w-9 text-orange-700" /><div><h1 className="text-2xl font-extrabold sm:text-3xl">Contrôle du ticket</h1><p className="mt-1 text-sm text-slate-600">Espace agent sécurisé{authorized ? ` • ${agentPhone}` : ""}</p></div></div>
+          <div className="flex items-center gap-3"><ShieldCheck className="h-9 w-9 text-orange-700" /><div><h1 className="text-2xl font-extrabold sm:text-3xl">Contrôle du ticket</h1><p className="mt-1 text-sm text-slate-600">Accès par code{authorized ? ` • ${agentLabel}` : ""}</p></div></div>
           <Button variant="outline" disabled={signingOut || confirming} onClick={() => void signOut()} className="h-11 rounded-xl"><LogOut /> Déconnexion</Button>
         </div>
         {authorizing ? <p role="status" className="flex items-center gap-3 rounded-2xl bg-white p-6"><Loader2 className="animate-spin" /> Vérification de votre autorisation…</p> : !authorized ? <section className="rounded-3xl border border-red-200 bg-red-50 p-6 text-red-900"><h2 className="text-xl font-bold">Accès non autorisé ou indisponible</h2><p role="alert" className="mt-3">{accessError}</p><Button variant="outline" onClick={() => setAccessRetry(value => value + 1)} className="mt-5 rounded-xl"><RefreshCw /> Réessayer</Button></section> : <>
