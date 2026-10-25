@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import TransportHeader from "@/components/TransportHeader";
 import BusIllustration from "@/components/BusIllustration";
+import HomeModules from "@/components/HomeModules";
+import TravelInformation from "@/components/TravelInformation";
 
 const cities = ["Dakar", "Ballou", "Touba", "Dara Djolof", "Ouroussogui", "Sèmè", "Tamba", "Kaolack", "Goudiry", "Kidira", "Bakel", "Bema", "Gabou", "Sarré"];
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
@@ -34,6 +36,7 @@ export default function Index() {
     <div className="min-h-screen bg-[#FAFBFD] text-brand-navy">
       <TransportHeader />
       <main className="mx-auto max-w-6xl px-5 pb-12 pt-8 md:px-8 md:pt-12">
+        <HomeModules onAccueil={() => { setChosen(false); setResult(null); }} />
         <div className="mb-8 flex items-center gap-3 text-xs font-semibold sm:text-sm">
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-orange text-white">{chosen ? <Check className="h-4 w-4" /> : "1"}</span>
           <button type="button" onClick={() => setChosen(false)} className="text-brand-navy hover:underline">Votre compagnie</button>
@@ -97,6 +100,7 @@ export default function Index() {
             </div>}
           </>
         )}
+        <TravelInformation />
         <section className="mt-12 border-t border-slate-200 pt-9">
           <h2 className="mb-6 text-xl font-bold sm:text-2xl">Pourquoi choisir Ballou Service Express ?</h2>
           <div className="grid gap-5 sm:grid-cols-3">{[{ icon: Ticket, title: "Réservez depuis chez vous", text: "Préparez votre voyage sans vous déplacer en gare." }, { icon: Clock3, title: "Des horaires clairs", text: "Retrouvez les jours de départ de DABO TRANSPORT." }, { icon: ShieldCheck, title: "Sans connexion Google", text: "Une fiche voyageur suffit pour votre réservation." }].map(({ icon: Icon, title, text }) => <div key={title} className="rounded-2xl border border-slate-200 bg-white p-5"><Icon className="mb-4 h-6 w-6 text-orange-600" /><h3 className="font-bold">{title}</h3><p className="mt-2 text-sm leading-relaxed text-slate-600">{text}</p></div>)}</div>

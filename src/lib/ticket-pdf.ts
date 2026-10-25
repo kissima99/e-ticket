@@ -1,7 +1,9 @@
 import { jsPDF } from "jspdf";
 import { formatTravelDate, type BookingTicket } from "@/lib/booking";
+import { createTicketQr, ticketVerificationUrl } from "@/lib/ticket-qr";
 
-export function createTicketPdf(ticket: BookingTicket) {
+export async function createTicketPdf(ticket: BookingTicket) {
+  const qrImage = await createTicketQr(ticket.verification_token);
   const doc = new jsPDF();
   const navy = "#002244";
   const orange = "#FF6B00";
@@ -41,5 +43,17 @@ export function createTicketPdf(ticket: BookingTicket) {
   doc.setFont("helvetica", "normal"); doc.setFontSize(9);
   doc.text(doc.splitTextToSize("Presentez-vous au point de montee 30 minutes avant le depart. Chaque passager doit presenter sa piece d'identite. Le reglement est a effectuer aupres de DABO TRANSPORT avant l'embarquement.", 174), 18, y);
   doc.setTextColor("#64748B"); doc.setFontSize(8); doc.text("Vos numeros de piece d'identite et de contact d'urgence ne figurent pas sur ce document.", 18, 285);
+  doc.addPage();
+  doc.setFillColor(navy); doc.rect(0,0,210,38,"F");
+  doc.setFont("helvetica","bold"); doc.setTextColor("#FFFFFF"); doc.setFontSize(18); doc.text("BALLOU SERVICE EXPRESS",105,22,{ align: "center" });
+  doc.setTextColor(navy); doc.setFontSize(16); doc.text("QR DE CONTROLE DU TICKET",105,55,{ align: "center" });
+  doc.addImage(qrImage,"PNG",65,68,80,80);
+  doc.link(65,68,80,80,{ url: ticketVerificationUrl(ticket.verification_token) });
+  doc.setFontSize(13); doc.text(`${ticket.departure_city} - ${ticket.arrival_city}`,105,165,{ align: "center" });
+  doc.setFont("helvetica","normal"); doc.setFontSize(11); doc.text(`${formatTravelDate(ticket.travel_date)} - 15h00`,105,177,{ align: "center" });
+  doc.text(doc.splitTextToSize(ticket.full_name,160),105,190,{ align: "center" });
+  doc.text(`Siege(s) : ${ticket.seat_number}`,105,209,{ align: "center" });
+  doc.text(`Paiement : ${ticket.payment_status} (${ticket.payment_method})`,105,223,{ align: "center" });
+  doc.setFontSize(10); doc.text(doc.splitTextToSize("L'agent scanne le QR avec son telephone pour consulter la reservation et l'etat de paiement en ligne. La page de controle n'autorise aucun debit, changement de paiement ou validation d'embarquement.",170),20,244);
   return doc;
 }
