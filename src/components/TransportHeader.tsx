@@ -1,9 +1,10 @@
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
-export default function TransportHeader({ back = false }: { back?: boolean }) {
+export default function TransportHeader({ back = false, children }: { back?: boolean; children?: ReactNode }) {
   return (
     <header className="relative overflow-hidden bg-brand-navy text-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-6 md:px-8 md:py-8">
@@ -30,6 +31,7 @@ export default function TransportHeader({ back = false }: { back?: boolean }) {
           </DialogContent>
         </Dialog>
       </div>
+      {children}
       <svg className="block h-7 w-full md:h-10" viewBox="0 0 1440 60" preserveAspectRatio="none" aria-hidden="true">
         <path d="M0 5 C400 0 750 100 1440 10 L1440 60 L0 60Z" fill="#FF6B00" />
         <path d="M0 20 C450 15 800 95 1440 15 L1440 60 L0 60Z" fill="#FAFBFD" />
