@@ -2,15 +2,26 @@ import { Link } from "react-router-dom";
 import { ArrowUpRight, Gift, House, Ticket } from "lucide-react";
 
 export default function HomeModules({ onAccueil }: { onAccueil: () => void }) {
-  const modules = [
-    { number: "01", title: "Accueil", text: "Compagnie, trajets, tarifs et horaires : toutes les informations pour préparer votre voyage.", icon: House, path: "/", style: "bg-blue-50 text-blue-800" },
-    { number: "02", title: "Réserver", text: "Votre trajet, votre siège, vos renseignements et le paiement, jusqu’au ticket avec QR.", icon: Ticket, path: "/reservation", style: "bg-orange-50 text-orange-800" },
-    { number: "03", title: "Ma Carte Cadeau", text: "Retrouvez votre carte fidélité, vos points, vos récompenses et vos codes cadeaux.", icon: Gift, path: "/fidelite", style: "bg-purple-50 text-purple-800" },
+  const links = [
+    { title: "Accueil", text: "Découvrez la compagnie, les tarifs et les horaires de départ.", icon: House, path: "/" },
+    { title: "Réserver", text: "Choisissez votre trajet et votre siège, puis obtenez votre ticket QR.", icon: Ticket, path: "/reservation" },
+    { title: "Carte cadeau", text: "Consultez vos points, vos récompenses et vos cartes cadeaux.", icon: Gift, path: "/fidelite" },
   ];
   return (
-    <nav aria-label="Modules de l’application" className="mb-10">
-      <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-extrabold text-brand-navy">Votre espace voyage</h2><span className="text-xs font-semibold text-slate-500">3 modules</span></div>
-      <div className="grid gap-3 md:grid-cols-3">{modules.map(({ number, title, text, icon: Icon, path, style }) => <Link key={title} to={path} onClick={path === "/" ? onAccueil : undefined} className="group rounded-3xl border border-slate-200 bg-white p-5 text-brand-navy shadow-sm transition-colors hover:border-orange-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-600 sm:p-6"><div className="mb-4 flex items-center justify-between"><span className={`flex h-12 w-12 items-center justify-center rounded-2xl ${style}`}><Icon className="h-6 w-6" /></span><span className="text-xs font-bold tracking-widest text-slate-500">MODULE {number}</span></div><div className="flex items-center justify-between gap-2"><h3 className="text-xl font-extrabold">{title}</h3><ArrowUpRight className="h-5 w-5 text-orange-700 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 motion-reduce:transform-none" /></div><p className="mt-2 text-sm leading-relaxed text-slate-600">{text}</p></Link>)}</div>
+    <nav aria-label="Navigation principale" className="mb-10 sm:mb-12">
+      <h2 className="mb-5 text-2xl font-extrabold tracking-tight text-brand-navy sm:text-3xl">Votre espace voyage</h2>
+      <div className="grid gap-4 md:grid-cols-3">
+        {links.map(({ title, text, icon: Icon, path }) => (
+          <Link key={title} to={path} onClick={path === "/" ? onAccueil : undefined} aria-current={path === "/" ? "page" : undefined} className={`group flex h-full flex-col rounded-3xl border p-5 text-brand-navy shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-600 sm:p-6 ${path === "/" ? "border-orange-300 bg-orange-50/60" : "border-slate-200 bg-white hover:border-orange-300 hover:bg-orange-50/30"}`}>
+            <div className="flex items-center gap-3">
+              <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${path === "/" ? "bg-brand-orange text-brand-navy" : "bg-slate-100 text-brand-navy"}`}><Icon className="h-6 w-6" aria-hidden="true" /></span>
+              <h3 className="flex-1 text-xl font-extrabold tracking-tight sm:text-2xl">{title}</h3>
+              <ArrowUpRight className="h-5 w-5 shrink-0 text-orange-700 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 motion-reduce:transform-none" aria-hidden="true" />
+            </div>
+            <p className="mt-4 text-base leading-relaxed text-slate-600">{text}</p>
+          </Link>
+        ))}
+      </div>
     </nav>
   );
 }

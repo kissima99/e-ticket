@@ -1,27 +1,26 @@
 import { Link } from "react-router-dom";
-import { Bus, ArrowLeft, MessageCircle } from "lucide-react";
+import { ArrowLeft, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 export default function TransportHeader({ back = false }: { back?: boolean }) {
   return (
     <header className="relative overflow-hidden bg-brand-navy text-white">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-6 md:px-8 md:py-8">
-        <Link to="/" aria-label="Accueil Ballou Service Express" className="flex items-center gap-3">
-          {back && <ArrowLeft className="hidden h-5 w-5 sm:block" />}
-          <span className="relative flex h-12 w-12 items-center justify-center rounded-2xl border border-white/20 sm:h-16 sm:w-16">
-            <Bus className="h-8 w-8 text-white sm:h-10 sm:w-10" />
-            <span className="absolute -bottom-1 left-2 h-1.5 w-8 rounded-full bg-brand-orange" />
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-6 md:px-8 md:py-8">
+        <Link to="/" aria-label="Accueil Ballou Service Express" className="flex min-w-0 items-center gap-3 sm:gap-4">
+          {back && <ArrowLeft className="hidden h-5 w-5 shrink-0 sm:block" />}
+          <span className="flex h-14 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white p-1 sm:h-20 sm:w-32 sm:rounded-2xl">
+            <img src="/assets/bus-ballou-service-express.jpeg" alt="Bus Ballou Service Express" className="h-full w-full object-contain" />
           </span>
           <span>
             <span className="block text-2xl font-black tracking-wide sm:text-4xl">BALLOU</span>
-            <span className="block text-[10px] font-bold tracking-[0.18em] text-brand-orange sm:text-xs">SERVICE EXPRESS</span>
+            <span className="mt-1 block text-[11px] font-bold tracking-[0.1em] text-brand-orange sm:text-sm">SERVICE EXPRESS</span>
           </span>
         </Link>
         <Dialog>
           <DialogTrigger asChild>
-            <Button variant="outline" className="rounded-full border-white/30 bg-transparent px-3 text-white hover:bg-white/10 hover:text-white sm:px-5">
-              <MessageCircle className="mr-2 h-4 w-4" /> Contact
+            <Button variant="outline" className="h-11 w-11 shrink-0 rounded-full border-white/30 bg-transparent p-0 text-white hover:bg-white/10 hover:text-white sm:w-auto sm:gap-2 sm:px-5 sm:text-base">
+              <MessageCircle className="h-5 w-5" /><span className="sr-only sm:not-sr-only">Contact</span>
             </Button>
           </DialogTrigger>
           <DialogContent className="rounded-3xl text-brand-navy">
