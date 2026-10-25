@@ -11,9 +11,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Bus, Calendar, MapPin, User, Phone, CreditCard, ChevronRight, CheckCircle, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useSearchParams } from "react-router-dom";
+import TransportHeader from "@/components/TransportHeader";
 
 const CITIES = [
-  "Dakar", "Ballou", "Touba", "Dara Djolof", "Ouroussogui", 
+  "Dakar", "Ballou", "Touba", "Dara Djolof", "Ouroussogui",
   "Sèmè", "Tamba", "Kaolack", "Goudiry", "Kidira", "Bakel", "Bema", "Gabou", "Sarré"
 ];
 
@@ -25,11 +27,12 @@ const DEPARTURE_DAYS = {
 const SEATS = Array.from({ length: 45 }, (_, i) => (i + 1).toString());
 
 export default function Reservation() {
+  const [params] = useSearchParams();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
-    departure_city: "",
-    arrival_city: "",
-    travel_date: "",
+    departure_city: CITIES.includes(params.get("departure") || "") ? params.get("departure")! : "",
+    arrival_city: CITIES.includes(params.get("arrival") || "") ? params.get("arrival")! : "",
+    travel_date: /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") || "") ? params.get("date")! : "",
     seat_number: "",
     passenger_count: 1,
     civility: "M.",
@@ -223,24 +226,8 @@ export default function Reservation() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-brand-blue text-white shadow-lg">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Bus className="h-8 w-8" />
-              <div>
-                <h1 className="text-xl font-bold">BALLOU SERVICE EXPRESS</h1>
-                <p className="text-sm opacity-90">DABO TRANSPORT</p>
-              </div>
-            </div>
-            <div className="hidden md:flex space-x-4">
-              <span className="text-sm opacity-90">12 000 FCFA / pers.</span>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-[#FAFBFD]">
+      <TransportHeader back />
 
       {/* Progress Steps */}
       <div className="container mx-auto px-4 py-6">
@@ -254,11 +241,11 @@ export default function Reservation() {
             </div>
           ))}
         </div>
-        <div className="flex justify-center mt-2 text-sm text-gray-600">
-          <span className={step === 1 ? "font-bold text-brand-blue" : ""}>Trajet</span>
-          <span className="mx-4">{step === 2 ? "font-bold text-brand-blue" : ""}>Voyageur</span>
-          <span className="mx-4">{step === 3 ? "font-bold text-brand-blue" : ""}>Paiement</span>
-          <span className={step === 4 ? "font-bold text-brand-blue" : ""}>Confirmation</span>
+        <div className="flex justify-center gap-3 mt-2 text-xs sm:text-sm text-gray-600">
+          <span className={step === 1 ? "font-bold text-brand-navy" : ""}>Trajet</span>
+          <span className={step === 2 ? "font-bold text-brand-navy" : ""}>Voyageur</span>
+          <span className={step === 3 ? "font-bold text-brand-navy" : ""}>Paiement</span>
+          <span className={step === 4 ? "font-bold text-brand-navy" : ""}>Confirmation</span>
         </div>
       </div>
 
