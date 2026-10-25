@@ -6,7 +6,7 @@ const phone = z.string().regex(/^\+[1-9]\d{7,14}$/);
 const credentials = { phone, ticket_id: z.string().regex(/^BSE-[A-F0-9]{32}$/) };
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("balance"), ...credentials }),
-  z.object({ action: z.literal("redeem"), ...credentials, request_id: z.string().uuid(), reward_type: z.enum(["DISCOUNT", "GIFT_CARD", "AIRTIME", "DATA"]), recipient_phone: phone.optional(), operator: z.enum(["Orange", "Free", "Expresso", "Wave"]).optional() }),
+  z.object({ action: z.literal("redeem"), ...credentials, request_id: z.string().uuid(), reward_type: z.enum(["DISCOUNT", "GIFT_CARD", "AIRTIME", "DATA"]), recipient_phone: phone.optional(), operator: z.enum(["Orange", "Free", "Expresso"]).optional() }),
 ]);
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" } });
 
@@ -44,7 +44,7 @@ Deno.serve(async req => {
       client.from("loyalty_profiles").select("points_balance,total_lifetime_points").eq("phone", input.phone).maybeSingle(),
       client.from("loyalty_transactions").select("id,points_change,type,description,created_at").eq("phone", input.phone).order("created_at", { ascending: false }).limit(20),
       client.from("gift_cards").select("id,code,discount_percent,reward_type,is_used,created_at").eq("created_for_phone", input.phone).order("created_at", { ascending: false }).limit(20),
-      client.from("reward_requests").select("id,phone,operator,reward_type,status,created_at").eq("account_phone", input.phone).order("created_at", { ascending: false }).limit(20),
+      client.from("reward_requests").select("id,phone,operator,reward_type,status,amount_fcfa,fulfillment_reference,fulfilled_at,created_at").eq("account_phone", input.phone).order("created_at", { ascending: false }).limit(20),
       client.from("reservations_dabo").select("id", { count: "exact", head: true }).eq("phone", input.phone).not("request_id", "is", null).eq("payment_status", "Payé"),
       client.from("reservations_dabo").select("id", { count: "exact", head: true }).eq("phone", input.phone).not("request_id", "is", null).eq("payment_status", "En attente"),
     ]);

@@ -8,6 +8,8 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("logout") }),
   z.object({ action: z.literal("list"), page: z.number().int().min(0).max(100000), status: z.enum(["ALL", "PAID", "PENDING"]), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")), departure: z.enum(["ALL", "Dakar", "Ballou"]) }),
   z.object({ action: z.literal("confirm"), reservation_id: z.string().uuid() }),
+  z.object({ action: z.literal("rewards"), page: z.number().int().min(0).max(100000), status: z.enum(["ALL", "PENDING", "FULFILLED"]) }),
+  z.object({ action: z.literal("fulfill_reward"), reward_id: z.string().uuid(), reference: z.string().trim().max(120).optional(), confirmed: z.literal(true) }),
 ]);
 const reply = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" } });
 
@@ -42,6 +44,25 @@ Deno.serve(async req => {
       const { error } = await client.from("ticket_agent_sessions").update({ revoked: true }).eq("id", session.id);
       if (error) throw error;
       return reply({ signed_out: true });
+    }
+    if (request.action === "rewards") {
+      let query = client.from("reward_requests").select("id,account_phone,phone,operator,reward_type,status,amount_fcfa,fulfillment_reference,fulfilled_at,created_at", { count: "exact" });
+      if (request.status !== "ALL") query = query.eq("status", request.status === "PENDING" ? "En attente" : "Délivré");
+      const { data, count, error } = await query.order("created_at", { ascending: false }).order("id", { ascending: false }).range(request.page * 25, request.page * 25 + 24);
+      if (error) throw error;
+      return reply({ rewards: data, total: count });
+    }
+    if (request.action === "fulfill_reward") {
+      const { data, error } = await client.rpc("fulfill_dabo_reward", { p_reward: request.reward_id, p_agent_session: session.id, p_reference: request.reference || null });
+      if (error) {
+        if (error.message.includes("AGENT_ACCESS_DENIED")) return reply({ error: "Session agent invalide.", code: "SESSION_EXPIRED" }, 401);
+        if (error.message.includes("REWARD_NOT_FOUND")) return reply({ error: "Récompense introuvable." }, 404);
+        if (error.message.includes("INVALID_REWARD_STATUS")) return reply({ error: "Cette demande ne relève pas des nouvelles récompenses de 2 000 FCFA ou n’est plus en attente." }, 409);
+        if (error.message.includes("INVALID_REFERENCE")) return reply({ error: "Renseignez une référence de recharge de 3 à 120 caractères." }, 400);
+        throw error;
+      }
+      console.info("[dabo-ticket-control] Reward fulfillment recorded", { reward_id: request.reward_id, agent_session_id: session.id, already_fulfilled: data.already_fulfilled });
+      return reply(data);
     }
     if (request.action === "confirm") {
       const { data, error } = await client.rpc("confirm_dabo_ticket_payment", { p_reservation: request.reservation_id, p_agent_session: session.id });

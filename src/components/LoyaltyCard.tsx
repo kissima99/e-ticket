@@ -2,10 +2,10 @@ import { CreditCard, Gift, Hourglass, LockKeyhole, Phone, Signal, Sparkles, Tick
 import { Button } from "@/components/ui/button";
 
 export const rewards = [
-  { type: "DISCOUNT", title: "1. Réduction de 15 % sur mon billet", text: "Un code personnel pour votre prochaine réservation.", icon: Ticket },
-  { type: "GIFT_CARD", title: "2. Générer un bon d’achat / carte cadeau", text: "Un code de 15 % à offrir à un proche.", icon: Gift },
-  { type: "AIRTIME", title: "3. Recharger du crédit téléphonique", text: "Une demande de recharge auprès de la compagnie.", icon: Phone },
-  { type: "DATA", title: "4. Recharger un pass internet", text: "Une demande de pass pour votre numéro et opérateur.", icon: Signal },
+  { type: "DISCOUNT", title: "1. Code promo unique • réduction de 15 %", text: "Généré immédiatement, personnel et utilisable une seule fois sur votre prochain billet.", icon: Ticket },
+  { type: "GIFT_CARD", title: "2. Bon d’achat de 2 000 FCFA", text: "Délivré par l’admin, avec une référence unique à présenter auprès de la compagnie.", icon: Gift },
+  { type: "AIRTIME", title: "3. Crédit téléphonique de 2 000 FCFA", text: "Recharge effectuée manuellement par l’admin sur le numéro de votre choix.", icon: Phone },
+  { type: "DATA", title: "4. Pass internet de 2 000 FCFA", text: "Pass délivré manuellement par l’admin auprès de votre opérateur.", icon: Signal },
 ] as const;
 export type RewardType = typeof rewards[number]["type"];
 
