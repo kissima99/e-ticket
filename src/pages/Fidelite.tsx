@@ -1,422 +1,86 @@
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { Copy, Gift, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useToast } from "@/components/ui/use-toast";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Star } from "lucide-react";
+import { normalizePhone } from "@/lib/booking";
+import TransportHeader from "@/components/TransportHeader";
+import LoyaltyCard, { rewards, type RewardType } from "@/components/LoyaltyCard";
 
-const REWARDS = [
-  { id: 1, title: "Réduction 15% sur ticket", description: "Code promo unique -15% pour votre prochain achat", points: 10, unlocked: false, type: "discount" },
-  { id: 2, title: "Carte Cadeau / Bon d'achat", description: "Code bon d'achat -15% partageable à un proche", points: 10, unlocked: false, type: "gift_card" },
-  { id: 3, title: "Achat Crédit Téléphonique", description: "Demande de recharge à renseigner", points: 10, unlocked: false, type: "airtime" },
-  { id: 4, title: "Achat Pass Internet", description: "Demande de pass internet à renseigner", points: 10, unlocked: false, type: "data" },
-  { id: 5, title: "Laisser cumuler les points", description: "Continuer à accumuler au-delà de 10 points", points: 0, unlocked: false, type: "continue" },
-];
+type Credentials = { phone: string; ticket_id: string };
+type Snapshot = { full_name: string; phone: string; points_balance: number; total_lifetime_points: number; transactions: { id: string; points_change: number; description: string; created_at: string }[]; cards: { id: string; code: string; discount_percent: number; reward_type: RewardType; is_used: boolean }[]; requests: { id: string; phone: string; operator: string; reward_type: string; status: string }[] };
+const inputClass = "h-12 rounded-xl border-slate-200 focus-visible:ring-brand-orange";
 
 export default function Fidelite() {
-  const [phone, setPhone] = useState<string>("");
-  const [fullName, setFullName] = useState<string>("");
-  const [pointsBalance, setPointsBalance] = useState<number>(0);
-  const [totalLifetimePoints, setTotalLifetimePoints] = useState<number>(0);
-  const [showRewardPanel, setShowRewardPanel] = useState<boolean>(false);
-  const [selectedReward, setSelectedReward] = useState<number | null>(null);
-  const [requestData, setRequestData] = useState({
-    operator: "",
-    phone_number: "",
-  });
-  const [showRequestModal, setShowRequestModal] = useState<boolean>(false);
-  const [transactions, setTransactions] = useState<Array<{type: string, description: string, points: number, date: string}>>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const location = useLocation();
+  const passed = location.state as { phone?: string; ticketId?: string } | null;
+  const [phone, setPhone] = useState(typeof passed?.phone === "string" ? passed.phone : "");
+  const [ticketId, setTicketId] = useState(typeof passed?.ticketId === "string" ? passed.ticketId : "");
+  const [access, setAccess] = useState<Credentials | null>(null);
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [redeeming, setRedeeming] = useState(false);
+  const [error, setError] = useState("");
+  const [selected, setSelected] = useState<RewardType | null>(null);
+  const [recipient, setRecipient] = useState("");
+  const [operator, setOperator] = useState("Orange");
+  const [paused, setPaused] = useState(false);
+  const requestId = useRef(crypto.randomUUID());
+  const reward = rewards.find(value => value.type === selected);
 
-  const { toast } = useToast();
-
-  useEffect(() => {
-    fetchLoyaltyData();
-  }, []);
-
-  const fetchLoyaltyData = async () => {
-    const demoPhone = phone || "+221 7X XXX XX XX";
-    
-    setIsLoading(true);
+  async function load(credentials: Credentials) {
+    if (!/^\+[1-9]\d{7,14}$/.test(credentials.phone) || !/^BSE-[A-F0-9]{32}$/.test(credentials.ticket_id)) { setError("Indiquez un téléphone valide et le numéro complet de votre premier ticket (BSE-…)."); return; }
+    setBusy(true); setError("");
     try {
-      const { data: profile, error } = await supabase
-        .from("loyalty_profiles")
-        .select("*")
-        .eq("phone", demoPhone)
-        .single();
-
-      if (error && error.code !== 'PGRST116') throw error;
-
-      if (profile) {
-        setPointsBalance(profile.points_balance);
-        setTotalLifetimePoints(profile.total_lifetime_points);
-      } else {
-        await supabase.from("loyalty_profiles").insert({
-          phone: demoPhone,
-          full_name: fullName || "Voyageur",
-          points_balance: 0,
-          total_lifetime_points: 0,
-        });
-        setPointsBalance(0);
-        setTotalLifetimePoints(0);
-      }
-
-      const { data: tx, error: txError } = await supabase
-        .from("loyalty_transactions")
-        .select("*")
-        .eq("phone", demoPhone)
-        .order("created_at", { ascending: false })
-        .limit(10);
-
-      if (txError) throw txError;
-      setTransactions(tx || []);
-    } catch (err) {
-      console.error("Error fetching loyalty data:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPhone(e.target.value);
-  };
-
-  const handleFullNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFullName(e.target.value);
-  };
-
-  const updateRewardStatus = (rewardId: number) => {
-    const reward = REWARDS.find(r => r.id === rewardId);
-    if (!reward) return;
-
-    if (pointsBalance >= 10) {
-      REWARDS[rewardId - 1].unlocked = true;
-      setPointsBalance(pointsBalance - 10);
-      
-      supabase.from("loyalty_transactions").insert({
-        phone,
-        points_change: -10,
-        type: "REDEEM_DISCOUNT",
-        description: reward.title + " - " + new Date().toLocaleDateString(),
-      });
-
-      if (reward.id === 1) {
-        setTimeout(() => {
-          toast.success("Félicitations ! Code réduction -15% généré : BALLOU" + Math.random().toString(36).slice(2, 8).toUpperCase());
-        }, 500);
-      } else if (reward.id === 2) {
-        setTimeout(() => {
-          toast.success("Félicitations ! Code carte cadeau généré : GC-BALLOU" + Math.random().toString(36).slice(2, 8).toUpperCase());
-        }, 500);
-      } else if (reward.id === 5) {
-        setTimeout(() => {
-          toast.success("Points conservés ! Vous pouvez continuer à accumuler.");
-        }, 500);
-      }
-
-      setShowRewardPanel(false);
-      setSelectedReward(null);
-    } else {
-      toast.error("Vous avez besoin de 10 points (actuel: " + pointsBalance + "/10)");
-    }
-  };
-
-  const handleRewardRequest = () => {
-    const { operator, phone_number } = requestData;
-    if (!operator || !phone_number) {
-      toast.error("Veuillez remplir tous les champs");
-      return;
-    }
-
-    supabase.from("reward_requests").insert({
-      phone,
-      operator,
-      reward_type: requestData.rewardType || "AIRTIME",
-      status: "En attente",
-    });
-
-    setShowRequestModal(false);
-    setRequestData({ operator: "", phone_number: "", rewardType: "AIRTIME" });
-    toast.success("Demande envoyée avec succès ! Elle sera traitée sous 24h.");
-  };
-
-  const getProgressColor = () => {
-    if (pointsBalance >= 10) return "bg-brand-yellow";
-    if (pointsBalance > 0) return "bg-brand-yellow";
-    return "bg-gray-200";
-  };
-
-  const getProgressPercent = () => {
-    return Math.min((pointsBalance / 10) * 100, 100);
-  };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <span>Chargement...</span>
-      </div>
-    );
+      const { data, error } = await supabase.functions.invoke("dabo-loyalty", { body: { action: "balance", ...credentials } });
+      if (error) throw new Error("Service indisponible. Réessayez dans quelques instants.");
+      if (data?.error) throw new Error(data.error);
+      if (!data?.snapshot) throw new Error("Solde non reçu. Réessayez.");
+      setAccess(credentials); setSnapshot(data.snapshot); setRecipient(credentials.phone);
+    } catch (err) { setError(err instanceof Error ? err.message : "Impossible de consulter votre carte."); }
+    finally { setBusy(false); }
   }
-
+  useEffect(() => {
+    if (typeof passed?.phone === "string" && typeof passed?.ticketId === "string") void load({ phone: normalizePhone(passed.phone), ticket_id: passed.ticketId.trim().toUpperCase() });
+  }, []);
+  function choose(type: RewardType) { requestId.current = crypto.randomUUID(); setSelected(type); setRecipient(access?.phone || ""); setOperator("Orange"); setError(""); }
+  async function redeem() {
+    if (!access || !selected || redeeming) return;
+    const destination = normalizePhone(recipient);
+    if (["AIRTIME", "DATA"].includes(selected) && !/^\+[1-9]\d{7,14}$/.test(destination)) { toast.error("Indiquez un numéro bénéficiaire valide."); return; }
+    setRedeeming(true); setError("");
+    try {
+      const { data, error } = await supabase.functions.invoke("dabo-loyalty", { body: { action: "redeem", ...access, request_id: requestId.current, reward_type: selected, ...(["AIRTIME", "DATA"].includes(selected) ? { recipient_phone: destination, operator } : {}) } });
+      if (error) throw new Error("Échange non confirmé. Réessayez sans fermer cette fenêtre : la demande ne sera débitée qu’une fois.");
+      if (data?.error) throw new Error(data.error);
+      if (!data?.snapshot || !data?.reward) throw new Error("Confirmation non reçue. Veuillez réessayer.");
+      setSnapshot(data.snapshot); setSelected(null);
+      toast.success(data.reward.code ? "Votre code est prêt ! 10 points ont été échangés." : "Demande enregistrée. 10 points ont été échangés.");
+    } catch (err) { setError(err instanceof Error ? err.message : "L’échange n’a pas pu être confirmé."); }
+    finally { setRedeeming(false); }
+  }
+  async function copy(code: string) { try { await navigator.clipboard.writeText(code); toast.success("Code copié."); } catch { toast.error("Copie indisponible. Sélectionnez et copiez le code affiché."); } }
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-brand-blue text-white shadow-lg">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Star className="h-8 w-8" />
-              <div>
-                <h1 className="text-xl font-bold">Mon Compte</h1>
-                <p className="text-sm opacity-90">Fidélité & Récompenses</p>
-              </div>
-            </div>
-            <div className="hidden md:flex space-x-4">
-              <span className="text-sm font-medium">Points: {pointsBalance}</span>
-            </div>
+    <div className="min-h-screen bg-[#FAFBFD] text-brand-navy">
+      <TransportHeader back />
+      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+        {!access ? <form onSubmit={event => { event.preventDefault(); void load({ phone: normalizePhone(phone), ticket_id: ticketId.trim().toUpperCase() }); }} className="mb-7 rounded-3xl border border-slate-200 bg-white p-5 sm:p-7"><div className="mb-5 flex items-start gap-3"><ShieldCheck className="h-6 w-6 shrink-0 text-orange-700" /><div><h2 className="font-bold">Retrouvez votre carte personnelle</h2><p className="mt-1 text-sm text-slate-600">Votre téléphone et le numéro de votre premier ticket servent de clé d’accès. Conservez ce numéro privé ; une nouvelle réservation au même téléphone ne donne pas accès à une carte existante.</p></div></div><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="loyalty-phone">Téléphone voyageur</Label><Input id="loyalty-phone" type="tel" autoComplete="tel" maxLength={25} value={phone} onChange={event => setPhone(event.target.value)} placeholder="77 123 45 67" className={inputClass} required /></div><div className="space-y-2"><Label htmlFor="loyalty-ticket">Numéro du premier ticket</Label><Input id="loyalty-ticket" autoComplete="off" maxLength={40} value={ticketId} onChange={event => setTicketId(event.target.value.toUpperCase())} placeholder="BSE-… (voir votre PDF)" className={inputClass} required /></div></div><Button disabled={busy} className="mt-5 h-12 w-full rounded-xl bg-brand-orange font-bold text-brand-navy hover:bg-orange-500">{busy ? <Loader2 className="animate-spin" /> : <Gift />} Consulter ma carte</Button></form> : <div className="mb-5 flex flex-wrap items-center justify-between gap-3 text-sm"><span>Carte de <strong>{snapshot?.full_name}</strong> • {access.phone}</span><div className="flex gap-2"><Button onClick={() => void load(access)} disabled={busy || redeeming} variant="outline" className="rounded-xl"><RefreshCw className={busy ? "animate-spin" : ""} /> Actualiser</Button><Button variant="ghost" onClick={() => { setAccess(null); setSnapshot(null); setPhone(""); setTicketId(""); setPaused(false); setError(""); }} disabled={busy || redeeming} className="rounded-xl">Quitter la carte</Button></div></div>}
+        {error && !selected && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-4 text-sm text-red-800">{error}</p>}
+        <div className="grid items-start gap-6 lg:grid-cols-[1.2fr_1fr]">
+          <LoyaltyCard points={snapshot?.points_balance ?? null} name={snapshot?.full_name} paused={paused} busy={busy || redeeming} onChoose={choose} onPause={() => { setPaused(true); toast.success("Vos points restent inchangés."); }} onResume={() => setPaused(false)} />
+          <div className="space-y-6">
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6"><h2 className="mb-4 text-lg font-extrabold">Mes codes & cartes cadeaux</h2>{snapshot?.cards.length ? <div className="space-y-4">{snapshot.cards.map(card => <div key={card.id} className="rounded-2xl border border-orange-200 bg-orange-50/40 p-4"><div className="mb-2 flex items-center justify-between gap-2"><span className="text-sm font-bold">{card.reward_type === "DISCOUNT" ? "Ma réduction" : "Carte cadeau"} • −{card.discount_percent} %</span><span className="text-xs text-slate-600">{card.is_used ? "Utilisé" : "Disponible"}</span></div><p className="break-all font-mono text-xs font-bold">{card.code}</p>{!card.is_used && <div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => void copy(card.code)} className="rounded-lg"><Copy /> Copier</Button>{card.reward_type === "GIFT_CARD" && <Button size="sm" asChild className="rounded-lg bg-green-700 text-white hover:bg-green-800"><a href={`https://wa.me/?text=${encodeURIComponent(`Je t’offre une carte cadeau BALLOU SERVICE EXPRESS : -15 % sur une réservation DABO TRANSPORT. Code : ${card.code}. À saisir à l’étape paiement sur ${new URL("/", window.location.origin).href}`)}`} target="_blank" rel="noopener noreferrer">Offrir via WhatsApp</a></Button>}</div>}</div>)}</div> : <p className="text-sm leading-relaxed text-slate-600">Vos codes apparaîtront ici après validation d’une récompense. Ils se saisissent à l’étape paiement d’une nouvelle réservation.</p>}</section>
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6"><h2 className="mb-4 text-lg font-extrabold">Mes demandes de recharge</h2>{snapshot?.requests.length ? <ul className="space-y-3">{snapshot.requests.map(request => <li key={request.id} className="rounded-xl bg-slate-50 p-4 text-sm"><p className="font-bold">{request.reward_type === "AIRTIME" ? "Crédit téléphonique" : "Pass internet"} • {request.operator}</p><p className="mt-1 text-slate-600">{request.phone}</p><p className="mt-2 text-xs font-semibold text-orange-800">{request.status}</p></li>)}</ul> : <p className="text-sm text-slate-600">Aucune demande pour le moment. Les recharges sont traitées manuellement par la compagnie.</p>}</section>
           </div>
         </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8">
-        <div className="card-transport mb-8 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-brand-blue">{pointsBalance}</h2>
-              <p className="text-gray-600">points actuels</p>
-            </div>
-            <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div 
-                className={getProgressColor() + " h-full rounded-full transition-all duration-500 ease-out"}
-                style={{ width: getProgressPercent() + "%" }}
-              />
-            </div>
-            <p className="text-sm text-gray-500">
-              {pointsBalance}/10 points
-            </p>
-          </div>
-
-          {pointsBalance < 10 && (
-            <p className="mt-3 text-sm text-gray-600">
-              Continuez à réserver pour accumuler des points et débloquer des récompenses !
-            </p>
-          )}
-
-          {pointsBalance >= 10 && (
-            <p className="mt-3 text-sm text-green-600">
-              Félicitations ! Vous avez atteint le palier de 10 points. Sélectionnez une récompense ci-dessous.
-            </p>
-          )}
-        </div>
-
-        <div className="card-transport mb-8 p-6">
-          <h3 className="text-xl font-bold text-brand-blue mb-6">
-            {pointsBalance >= 10 ? "Vos récompenses disponibles" : "Programme de fidélité"}
-          </h3>
-
-          {pointsBalance < 10 && (
-            <div className="space-y-3">
-              {REWARDS.slice(0, 4).map(reward => (
-                <div key={reward.id} className="p-4 rounded-lg border-2 border-dashed border-gray-300 cursor-not-allowed hover:border-brand-yellow transition-colors">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <span className="text-2xl">{reward.id === 1 ? "🎫" : reward.id === 2 ? "🎁" : reward.id === 3 ? "📱" : "🌐"}</span>
-                    <div>
-                      <h4 className="font-medium text-brand-blue">{reward.title}</h4>
-                      <p className="text-sm text-gray-500">{reward.description}</p>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    Coût : {reward.points} points
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    Points restants : {pointsBalance}/10
-                  </p>
-                </div>
-              ))}
-              <div className="pt-4 border-t border-gray-200">
-                <p className="text-sm text-gray-500">
-                  Continuez à réserver pour atteindre 10 points
-                </p>
-              </div>
-            </div>
-          )}
-
-          {pointsBalance >= 10 && (
-            <div className="space-y-4">
-              {REWARDS.map(reward => (
-                <div key={reward.id} className={"p-4 rounded-lg border " + (reward.unlocked ? "border-green-500 bg-green-50" : "border-gray-300") + " transition-colors cursor-pointer " + (!reward.unlocked && pointsBalance < 10 ? "opacity-50 cursor-not-allowed" : "")}>
-                  <div className="flex items-center space-x-3 mb-3">
-                    <span className="text-2xl">{reward.id === 1 ? "🎫" : reward.id === 2 ? "🎁" : reward.id === 3 ? "📱" : "🌐"}</span>
-                    <div>
-                      <h4 className="font-medium text-brand-blue">{reward.title}</h4>
-                      <p className="text-sm text-gray-500">{reward.description}</p>
-                    </div>
-                  </div>
-                  
-                  {reward.unlocked && (
-                    <div className="flex justify-between text-xs">
-                      <span>{pointsBalance >= 10 ? "Débloqué" : "Besoin de " + (10 - pointsBalance) + " points"}</span>
-                      <span className="text-green-600">{pointsBalance >= 10 ? "-10 pts" : ""}</span>
-                    </div>
-                  )}
-
-                  {!reward.unlocked && pointsBalance >= 10 && (
-                    <button
-                      onClick={() => setSelectedReward(reward.id)}
-                      className="text-brand-blue text-sm hover:underline"
-                    >
-                      Sélectionner
-                    </button>
-                  )}
-
-                  {!reward.unlocked && pointsBalance < 10 && (
-                    <span className="text-gray-400 text-sm">
-                      {10 - pointsBalance} points manquant
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="card-transport p-6">
-          <h3 className="text-xl font-bold text-brand-blue mb-6">
-            Historique des transactions
-          </h3>
-
-          {transactions.length === 0 && (
-            <p className="text-gray-500 text-sm">
-              Aucune transaction pour le moment
-            </p>
-          )}
-
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="p-3 text-left text-sm font-medium text-gray-500">Type</th>
-                  <th className="p-3 text-left text-sm font-medium text-gray-500">Description</th>
-                  <th className="p-3 text-left text-sm font-medium text-gray-500">Points</th>
-                  <th className="p-3 text-left text-sm font-medium text-gray-500">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.map((tx, index) => (
-                  <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="p-3 text-sm font-medium">
-                      {tx.type === "EARN_TICKET" ? "Points gagnés" : tx.type}
-                    </td>
-                    <td className="p-3 text-sm text-gray-600">{tx.description || "N/A"}</td>
-                    <td className="p-3 text-sm font-medium">
-                      {tx.points_change > 0 ? "+" + tx.points_change : tx.points_change < 0 ? tx.points_change.toString() : "0"}
-                    </td>
-                    <td className="p-3 text-sm text-gray-500">{new Date(tx.created_at).toLocaleDateString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {showRewardPanel && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-            <div className="bg-white rounded-xl p-8 max-w-md w-full shadow-2xl relative">
-              <h3 className="text-2xl font-bold text-brand-blue mb-6">
-                {pointsBalance >= 10 ? "Choisissez votre récompense" : "Prochain palier"}
-              </h3>
-
-              {pointsBalance < 10 && (
-                <div className="mb-6 p-4 bg-yellow-50 rounded-lg border-yellow-200">
-                  <p className="text-yellow-800 font-medium">
-                    Vous avez {pointsBalance} point(s). Il vous manque {10 - pointsBalance} point(s) pour atteindre 10.
-                  </p>
-                  <p className="text-yellow-600 text-sm mt-1">
-                    Chaque réservation vous donne +1 point
-                  </p>
-                </div>
-              )}
-
-              {pointsBalance >= 10 && (
-                <div className="space-y-4">
-                  {REWARDS.map(reward => (
-                    <div key={reward.id} className={"p-4 rounded-lg border " + (reward.unlocked ? "border-green-500 bg-green-50 opacity-80" : "border-gray-300") + " cursor-pointer hover:border-brand-yellow transition-colors"}>
-                      <div className="flex items-center space-x-3 mb-3">
-                        <span className="text-2xl">{reward.id === 1 ? "🎫" : reward.id === 2 ? "🎁" : reward.id === 3 ? "📱" : "🌐"}</span>
-                        <div>
-                          <h4 className="font-medium text-brand-blue">{reward.title}</h4>
-                          <p className="text-sm text-gray-500">{reward.description}</p>
-                        </div>
-                      </div>
-                      
-                      {reward.unlocked && (
-                        <p className="text-green-600 text-sm">
-                          Déjà sélectionné - {10 - pointsBalance === 0 ? "points utilisés" : ""}
-                        </p>
-                      )}
-
-                      {!reward.unlocked && pointsBalance >= 10 && (
-                        <button
-                          onClick={() => setSelectedReward(reward.id)}
-                          className="mt-2 text-brand-blue text-sm hover:underline flex items-center space-x-1"
-                        >
-                          <span>✓</span>
-                          <span>Sélectionner</span>
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {selectedReward && (
-                <div className="mt-6 p-4 bg-brand-blue text-white rounded-lg">
-                  <h4 className="font-medium mb-2">Confirmation</h4>
-                  <p className="text-white/90 mb-4">
-                    Vous allez dépenser 10 points pour : {REWARDS.find(r => r.id === selectedReward)?.title || "récompense"}
-                  </p>
-                  <div className="flex space-x-4">
-                    <button
-                      onClick={() => {
-                        updateRewardStatus(selectedReward!);
-                        setSelectedReward(null);
-                        setShowRewardPanel(false);
-                      }}
-                      className="flex-1 bg-white text-brand-blue px-4 py-2 rounded-lg hover:bg-brand-blue-800"
-                    >
-                      Valider
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedReward(null);
-                        setShowRewardPanel(false);
-                      }}
-                      className="flex-1 bg-white border border-brand-blue px-4 py-2 rounded-lg hover:bg-brand-blue-800"
-                    >
-                      Annuler
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <button
-                onClick={() => setShowRewardPanel(false)}
-                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        )}
+        {snapshot && <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 sm:p-7"><div className="mb-4 flex flex-wrap justify-between gap-3"><h2 className="font-extrabold">Historique des points</h2><span className="text-sm text-slate-600">Total gagné : {snapshot.total_lifetime_points} points</span></div>{snapshot.transactions.length ? <ul className="divide-y divide-slate-100">{snapshot.transactions.map(transaction => <li key={transaction.id} className="flex items-center justify-between gap-4 py-4 text-sm"><div><p className="font-semibold">{transaction.description}</p><p className="mt-1 text-xs text-slate-500">{new Date(transaction.created_at).toLocaleDateString("fr-FR")}</p></div><span className={`shrink-0 font-bold ${transaction.points_change > 0 ? "text-green-700" : "text-orange-800"}`}>{transaction.points_change > 0 ? "+" : ""}{transaction.points_change} pts</span></li>)}</ul> : <p className="text-sm text-slate-600">Aucun mouvement. Les points seront crédités après validation du paiement de vos tickets.</p>}</section>}
       </main>
-
-      <footer className="bg-brand-blue text-white py-6 mt-12">
-        <div className="container mx-auto px-4 text-center text-sm opacity-80">
-          BALLOU SERVICE EXPRESS - DABO TRANSPORT © 2024
-        </div>
-      </footer>
+      <Dialog open={selected !== null} onOpenChange={open => { if (!open && !redeeming) { setSelected(null); setError(""); } }}><DialogContent className="max-h-[90dvh] overflow-y-auto rounded-3xl text-brand-navy"><DialogHeader><DialogTitle>{reward?.title}</DialogTitle><DialogDescription>Validez cet échange contre 10 points. Votre solde passera de {snapshot?.points_balance} à {Math.max((snapshot?.points_balance || 0)-10,0)} points.</DialogDescription></DialogHeader>{selected && ["AIRTIME", "DATA"].includes(selected) ? <div className="space-y-4"><div className="space-y-2"><Label htmlFor="recipient">Téléphone à recharger</Label><Input id="recipient" type="tel" maxLength={25} value={recipient} onChange={event => setRecipient(event.target.value)} className={inputClass} disabled={redeeming} /></div><div className="space-y-2"><Label htmlFor="operator">Opérateur</Label><Select value={operator} onValueChange={setOperator} disabled={redeeming}><SelectTrigger id="operator" className={inputClass}><SelectValue /></SelectTrigger><SelectContent>{["Orange", "Free", "Expresso", "Wave"].map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select></div><p className="text-xs text-slate-600">Cette validation enregistre une demande. La recharge, son montant ou le volume de data restent à confirmer par DABO TRANSPORT.</p></div> : <p className="rounded-xl bg-orange-50 p-4 text-sm text-orange-900">{selected === "DISCOUNT" ? "Votre code personnel de 15 % sera utilisable une seule fois avec votre téléphone voyageur." : "Votre code cadeau de 15 % pourra être transmis à un proche et utilisé une seule fois."}</p>}{error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}<div className="mt-2 grid grid-cols-2 gap-3"><Button variant="outline" disabled={redeeming} onClick={() => { setSelected(null); setError(""); }} className="h-12 rounded-xl">Annuler</Button><Button disabled={redeeming} onClick={() => void redeem()} className="h-12 rounded-xl bg-brand-orange font-bold text-brand-navy hover:bg-orange-500">{redeeming && <Loader2 className="animate-spin" />} Valider • 10 pts</Button></div></DialogContent></Dialog>
     </div>
   );
 }

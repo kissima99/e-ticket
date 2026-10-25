@@ -5,7 +5,7 @@ const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-
 const cities = ["Dakar", "Ballou", "Touba", "Dara Djolof", "Ouroussogui", "Sèmè", "Tamba", "Kaolack", "Goudiry", "Kidira", "Bakel", "Bema", "Gabou", "Sarré"];
 const phone = z.string().trim().regex(/^\+[1-9]\d{7,14}$/);
 const routeSchema = z.object({ departure_city: z.enum(["Dakar", "Ballou"]), travel_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => { const d = new Date(`${value}T15:00:00Z`); return Number.isFinite(d.getTime()) && d.toISOString().slice(0,10) === value; }) });
-const bookingSchema = routeSchema.extend({ arrival_city: z.string().refine(value => cities.includes(value)), seats: z.array(z.string().regex(/^([1-9]|[1-3][0-9]|4[0-5])$/)).min(1).max(5).refine(value => new Set(value).size === value.length), civility: z.enum(["M.", "Mme", "Mlle"]), full_name: z.string().trim().min(2).max(100), phone, identity_document_type: z.enum(["CNI", "Passeport"]), identity_document_number: z.string().trim().min(3).max(50), emergency_contact: phone, boarding_point: z.string().trim().min(3).max(150), luggage_count: z.number().int().min(0).max(5), payment_method: z.enum(["Cash", "Wave", "OM"]) });
+const bookingSchema = routeSchema.extend({ arrival_city: z.string().refine(value => cities.includes(value)), seats: z.array(z.string().regex(/^([1-9]|[1-3][0-9]|4[0-5])$/)).min(1).max(5).refine(value => new Set(value).size === value.length), civility: z.enum(["M.", "Mme", "Mlle"]), full_name: z.string().trim().min(2).max(100), phone, identity_document_type: z.enum(["CNI", "Passeport"]), identity_document_number: z.string().trim().min(3).max(50), emergency_contact: phone, boarding_point: z.string().trim().min(3).max(150), luggage_count: z.number().int().min(0).max(5), payment_method: z.enum(["Cash", "Wave", "OM"]), promo_code: z.string().trim().toUpperCase().max(50).optional() });
 const requestSchema = z.discriminatedUnion("action", [z.object({ action: z.literal("availability"), data: routeSchema }), z.object({ action: z.literal("book"), request_id: z.string().uuid(), data: bookingSchema })]);
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" } });
 
@@ -31,6 +31,7 @@ Deno.serve(async req => {
     if (error) {
       if (error.message.includes("SEAT_TAKEN")) return reply({ error: "Un siège sélectionné vient d’être réservé. Choisissez un autre siège.", code: "SEAT_TAKEN" });
       if (error.message.includes("INVALID_DATE")) return reply({ error: "Ce départ n’est pas disponible. Vérifiez la date et les jours de voyage.", code: "INVALID_DATE" });
+      if (error.message.includes("INVALID_PROMO")) return reply({ error: "Code de réduction invalide, déjà utilisé ou réservé à un autre téléphone.", code: "INVALID_PROMO" });
       if (error.message.includes("INVALID_")) return reply({ error: "Les informations du trajet sont invalides." });
       throw error;
     }

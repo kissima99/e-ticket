@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { CheckCircle2, Download, MessageCircle, Share2, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -42,6 +43,8 @@ export default function TicketConfirmation({ ticket, onNewBooking }: { ticket: B
           <div className="grid gap-3 sm:grid-cols-2"><Button onClick={download} className="h-12 rounded-xl bg-brand-orange font-bold text-brand-navy hover:bg-orange-500"><Download /> Télécharger le PDF</Button><Button asChild className="h-12 rounded-xl bg-green-700 font-bold text-white hover:bg-green-800"><a href={`https://wa.me/${ticket.phone.replace(/\D/g, "")}?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer"><MessageCircle /> Envoyer via WhatsApp</a></Button></div>
           <Button variant="outline" disabled={sharing} onClick={sharePdf} className="mt-3 h-12 w-full rounded-xl border-slate-300 text-brand-navy"><Share2 /> {sharing ? "Ouverture du partage…" : "Partager le fichier PDF"}</Button>
           <p className="mt-3 text-xs leading-relaxed text-slate-500">WhatsApp ouvre un message destiné au numéro voyageur, à envoyer vous-même. Pour joindre le PDF, utilisez le partage de fichier sur mobile ou attachez le PDF téléchargé. Aucun envoi automatique n’est effectué.</p>
+          <Button asChild variant="outline" className="mt-5 h-12 w-full rounded-xl border-orange-200 text-brand-navy hover:bg-orange-50"><Link to="/fidelite" state={{ phone: ticket.phone, ticketId: ticket.ticket_id }}>Consulter ma carte cadeau & fidélité</Link></Button>
+          <p className="mt-2 text-xs text-slate-500">Conservez le numéro de votre tout premier ticket privé : il sert de clé d’accès à votre carte avec votre téléphone. Les tickets suivants ne remplacent pas cette clé.</p>
           <Button variant="ghost" onClick={onNewBooking} className="mt-6 w-full rounded-xl text-brand-navy hover:bg-orange-50">Faire une nouvelle réservation</Button>
         </CardContent>
       </Card>

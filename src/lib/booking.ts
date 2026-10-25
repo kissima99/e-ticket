@@ -29,7 +29,7 @@ export const passengerSchema = z.object({
   boarding_point: z.string().trim().min(3, "Indiquez votre point de montée.").max(150),
   luggage_count: z.number().int().min(0).max(5),
 });
-export const paymentSchema = z.object({ payment_method: z.enum(["Cash", "Wave", "OM"], { errorMap: () => ({ message: "Choisissez Cash, Wave ou OM." }) }) });
+export const paymentSchema = z.object({ payment_method: z.enum(["Cash", "Wave", "OM"], { errorMap: () => ({ message: "Choisissez Cash, Wave ou OM." }) }), promo_code: z.string().trim().toUpperCase().max(50).optional() });
 export const bookingSchema = routeSchema.merge(passengerSchema).merge(paymentSchema).superRefine((data, context) => {
   if (data.departure_city === data.arrival_city) context.addIssue({ code: "custom", path: ["arrival_city"], message: "Le départ et l’arrivée doivent être différents." });
   const d = new Date(`${data.travel_date}T15:00:00Z`);
