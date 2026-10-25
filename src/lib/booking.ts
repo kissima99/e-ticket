@@ -17,7 +17,7 @@ export const routeSchema = z.object({
     const d = new Date(`${value}T15:00:00Z`);
     return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === value && d.getTime() > Date.now();
   }, "Choisissez une date de départ future."),
-  seats: z.array(z.string().regex(/^([1-9]|[1-3][0-9]|4[0-5])$/, "Choisissez un siège." )).min(1).max(5).refine(value => new Set(value).size === value.length, "Chaque passager doit avoir un siège différent."),
+  seats: z.array(z.string().regex(/^([1-9]|[1-6][0-9]|70)$/, "Choisissez un siège entre 1 et 70." )).min(1).max(5).refine(value => new Set(value).size === value.length, "Chaque passager doit avoir un siège différent."),
 });
 export const passengerSchema = z.object({
   civility: z.enum(["M.", "Mme", "Mlle"]),

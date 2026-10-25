@@ -108,6 +108,7 @@ export default function Index() {
             <AccordionContent className="pb-0 [&_section]:mt-0 [&_section]:rounded-none [&_section]:border-0"><TravelInformation /></AccordionContent>
           </AccordionItem>
         </Accordion>
+        <Link to="/controle-tickets" className="mt-6 block rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-bold text-brand-navy hover:border-orange-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-600">Contrôle du ticket — Espace agent</Link>
       </main>
       <footer className="border-t border-slate-200 px-5 py-5 text-center text-sm text-slate-600">Ballou Service Express • DABO TRANSPORT • © {new Date().getFullYear()}</footer>
     </div>
