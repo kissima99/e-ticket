@@ -4,16 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { lucideReact } from "lucide-react";
+import { Bus } from "lucide-react";
 
 export default function Admin() {
   const [adminEmail, setAdminEmail] = useState<string>("");
   const [adminPin, setAdminPin] = useState<string>("");
   const [login, setLogin] = useState<boolean>(false);
   const [show, setShow] = useState<boolean>(false);
-  const { toast } = useToast();
 
   const handleLogin = async () => {
     if (adminEmail !== "admin@dabotransport.sn" || adminPin !== "BALLOU2024") {
