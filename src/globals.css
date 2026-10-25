@@ -90,7 +90,7 @@
 }
 
 .btn-transport-secondary {
-  @apply bg-brand-navy text-white hover:bg-navy-800 focus-visible:ring-brand-navy;
+  @apply bg-brand-navy text-white hover:bg-brand-navy/90 focus-visible:ring-brand-navy;
 }
 
 /* Card styles */
