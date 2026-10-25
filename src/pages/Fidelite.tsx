@@ -96,7 +96,7 @@ export default function Fidelite() {
       if (data?.error) throw new Error(data.error);
       if (!data?.snapshot || !data?.reward) throw new Error("Confirmation non reçue. Veuillez réessayer.");
       setSnapshot(data.snapshot); setSelected(null);
-      toast.success(data.reward.code ? "Votre code promo unique de 15 % est prêt ! 10 points ont été échangés." : "Demande de 2 000 FCFA enregistrée pour l’admin. 10 points ont été échangés.");
+      toast.success(data.reward.code ? "Votre code promo unique de 15 % est prêt ! 5 points ont été échangés." : "Demande de 2 000 FCFA enregistrée pour l’admin. 5 points ont été échangés.");
     } catch (err) { setError(err instanceof Error ? err.message : "L’échange n’a pas pu être confirmé."); }
     finally { setRedeeming(false); }
   }
@@ -132,14 +132,14 @@ export default function Fidelite() {
       </main>
       <Dialog open={selected !== null} onOpenChange={open => { if (!open && !redeeming) { setSelected(null); setError(""); } }}>
         <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-3xl text-brand-navy">
-          <DialogHeader><DialogTitle>{reward?.title}</DialogTitle><DialogDescription>Validez cet échange contre 10 points. Votre solde passera de {snapshot?.points_balance} à {Math.max((snapshot?.points_balance || 0)-10,0)} points.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{reward?.title}</DialogTitle><DialogDescription>Validez cet échange contre 5 points. Votre solde passera de {snapshot?.points_balance} à {Math.max((snapshot?.points_balance || 0)-5,0)} points.</DialogDescription></DialogHeader>
           {selected && ["AIRTIME", "DATA"].includes(selected) ? <div className="space-y-4">
             <div className="space-y-2"><Label htmlFor="recipient">Téléphone à recharger</Label><Input id="recipient" type="tel" maxLength={25} value={recipient} onChange={event => setRecipient(event.target.value)} className={inputClass} disabled={redeeming} /></div>
             <div className="space-y-2"><Label htmlFor="operator">Opérateur</Label><Select value={operator} onValueChange={setOperator} disabled={redeeming}><SelectTrigger id="operator" className={inputClass}><SelectValue /></SelectTrigger><SelectContent>{["Orange", "Free", "Expresso"].map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select></div>
             <p className="rounded-xl bg-orange-50 p-4 text-sm text-orange-900">{selected === "AIRTIME" ? "Crédit téléphonique" : "Pass internet"} d’une valeur de <strong>2 000 FCFA</strong>, réalisé manuellement par l’admin. {selected === "DATA" && "Le volume et la durée du pass dépendent de l’offre de votre opérateur."} Vous retrouverez le statut et la référence ici après délivrance.</p>
           </div> : <p className="rounded-xl bg-orange-50 p-4 text-sm text-orange-900">{selected === "DISCOUNT" ? "Votre code promo unique de 15 % sera généré immédiatement. Il est personnel et utilisable une seule fois avec votre téléphone voyageur." : "L’admin délivrera un bon d’achat de 2 000 FCFA avec une référence unique à présenter auprès de la compagnie. Ce bon n’est pas utilisable dans le champ promo de réservation en ligne."}</p>}
           {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}
-          <div className="mt-2 grid grid-cols-2 gap-3"><Button variant="outline" disabled={redeeming} onClick={() => { setSelected(null); setError(""); }} className="h-12 rounded-xl">Annuler</Button><Button disabled={redeeming} onClick={() => void redeem()} className="h-12 rounded-xl bg-brand-orange font-bold text-brand-navy hover:bg-orange-500">{redeeming && <Loader2 className="animate-spin" />} Valider • 10 pts</Button></div>
+          <div className="mt-2 grid grid-cols-2 gap-3"><Button variant="outline" disabled={redeeming} onClick={() => { setSelected(null); setError(""); }} className="h-12 rounded-xl">Annuler</Button><Button disabled={redeeming} onClick={() => void redeem()} className="h-12 rounded-xl bg-brand-orange font-bold text-brand-navy hover:bg-orange-500">{redeeming && <Loader2 className="animate-spin" />} Valider • 5 pts</Button></div>
         </DialogContent>
       </Dialog>
     </div>

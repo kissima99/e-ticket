@@ -32,7 +32,7 @@ Deno.serve(async req => {
     if (input.action === "redeem") {
       const { data, error } = await client.rpc("redeem_dabo_loyalty", { p_phone: input.phone, p_ticket: input.ticket_id, p_request: input.request_id, p_type: input.reward_type, p_recipient: input.recipient_phone || null, p_operator: input.operator || null });
       if (error) {
-        if (error.message.includes("INSUFFICIENT_POINTS")) return reply({ error: "Votre solde doit atteindre 10 points pour choisir une récompense.", code: "INSUFFICIENT_POINTS" });
+        if (error.message.includes("INSUFFICIENT_POINTS")) return reply({ error: "Votre solde doit atteindre 5 points pour choisir une récompense.", code: "INSUFFICIENT_POINTS" });
         if (error.message.includes("INVALID_RECIPIENT")) return reply({ error: "Indiquez le numéro bénéficiaire et l’opérateur." });
         if (error.message.includes("ACCESS_DENIED")) return reply({ error: "Accès refusé." });
         throw error;

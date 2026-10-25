@@ -110,7 +110,12 @@ export default function Index() {
         </Accordion>
         <Link to="/controle-tickets" className="mt-6 block rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-bold text-brand-navy hover:border-orange-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-600">Contrôle du ticket — Espace agent</Link>
       </main>
-      <footer className="border-t border-slate-200 px-5 py-5 text-center text-sm text-slate-600">Ballou Service Express • DABO TRANSPORT • © {new Date().getFullYear()}</footer>
+      <footer className="border-t border-slate-200 text-center text-sm text-slate-600">
+        <p className="px-5 py-5">Ballou Service Express • DABO TRANSPORT • © {new Date().getFullYear()}</p>
+        <figure className="mx-auto max-w-2xl px-4 pb-6 sm:px-6 sm:pb-8">
+          <img src="/assets/affiche-reservez-payez-voyagez.png" alt="Réservez. Payez. Voyagez. — Ballou Service Express : un billet numérique sur téléphone et un autocar au coucher du soleil." width={1440} height={2437} loading="lazy" decoding="async" className="h-auto w-full rounded-3xl shadow-sm" />
+        </figure>
+      </footer>
     </div>
   );
 }
