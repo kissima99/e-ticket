@@ -38,7 +38,7 @@ export default function Index() {
             <p className="mt-4 text-base font-medium text-slate-200">Dakar ↔ Ballou • DABO TRANSPORT</p>
           </div>
           <div className="mx-auto w-full max-w-[240px] rounded-3xl bg-white p-2 sm:max-w-none sm:p-3">
-            <img src="/assets/bus-ballou-service-express.jpeg" alt="Autocar Ballou Service Express, blanc, bleu et orange" width={559} height={333} className="aspect-[559/333] w-full object-contain" />
+            <img src="/assets/bus-dabo-transport.png" alt="Autocar DABO TRANSPORT, blanc, bleu et orange" width={1024} height={610} className="aspect-[1024/610] w-full object-contain" />
           </div>
         </div>
       </TransportHeader>
@@ -77,7 +77,7 @@ export default function Index() {
             </div>
           </Card>
           <Button type="submit" className="mt-5 h-16 w-full rounded-2xl bg-brand-orange text-xl font-extrabold text-brand-navy shadow-sm hover:bg-orange-500 sm:h-20 sm:rounded-3xl sm:text-2xl"><Search className="mr-3 h-7 w-7" /> Rechercher</Button>
-          <p className="mt-4 text-center text-sm leading-relaxed text-slate-600">12 000 FCFA par personne • Départ à 15h00 • Sans compte Google</p>
+          <p className="mt-4 text-center text-sm leading-relaxed text-slate-600">12 000 FCFA par personne • Départ à 15h00</p>
         </form>
 
         {result && (
