@@ -8,6 +8,7 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("logout") }),
   z.object({ action: z.literal("list"), page: z.number().int().min(0).max(100000), status: z.enum(["ALL", "PAID", "PENDING"]), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")), departure: z.enum(["ALL", "Dakar", "Ballou"]) }),
   z.object({ action: z.literal("confirm"), reservation_id: z.string().uuid() }),
+  z.object({ action: z.literal("paid_ticket"), reservation_id: z.string().uuid() }),
   z.object({ action: z.literal("rewards"), page: z.number().int().min(0).max(100000), status: z.enum(["ALL", "PENDING", "FULFILLED"]) }),
   z.object({ action: z.literal("fulfill_reward"), reward_id: z.string().uuid(), reference: z.string().trim().max(120).optional(), confirmed: z.literal(true) }),
 ]);
@@ -44,6 +45,15 @@ Deno.serve(async req => {
       const { error } = await client.from("ticket_agent_sessions").update({ revoked: true }).eq("id", session.id);
       if (error) throw error;
       return reply({ signed_out: true });
+    }
+    if (request.action === "paid_ticket") {
+      const { data, error } = await client.from("reservations_dabo").select("ticket_id,departure_city,arrival_city,travel_date,seat_number,passenger_count,full_name,phone,boarding_point,luggage_count,payment_method,payment_status,total_amount,verification_token").eq("id", request.reservation_id).maybeSingle();
+      if (error) throw error;
+      if (!data) return reply({ error: "Ticket introuvable." }, 404);
+      if (data.payment_status !== "Payé" || !data.verification_token) return reply({ error: "Le PDF final avec QR est disponible uniquement après validation du paiement." }, 409);
+      if (data.total_amount === null) return reply({ error: "Montant du ticket non renseigné. Faites vérifier ce ticket par la compagnie avant de l’envoyer." }, 409);
+      console.info("[dabo-ticket-control] Paid ticket prepared for delivery", { reservation_id: request.reservation_id, agent_session_id: session.id });
+      return reply({ ticket: { ...data, boarding_point: data.boarding_point ?? "Non renseigné", luggage_count: data.luggage_count ?? 0 } });
     }
     if (request.action === "rewards") {
       let query = client.from("reward_requests").select("id,account_phone,phone,operator,reward_type,status,amount_fcfa,fulfillment_reference,fulfilled_at,created_at", { count: "exact" });

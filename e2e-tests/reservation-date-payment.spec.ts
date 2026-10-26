@@ -73,7 +73,7 @@ test("Choisir un trajet puis obtenir le QR uniquement après paiement validé", 
   await expect(page.getByRole("heading", { name: "Votre réservation est enregistrée" })).toBeVisible();
   await expect(page.getByText("Paiement en attente", { exact: true }).first()).toBeVisible();
   await expect(page.getByRole("img", { name: "QR de vérification du ticket avant embarquement" })).toHaveCount(0);
-  await expect(page.getByText(/DABO TRANSPORT vous souhaite/)).toHaveCount(0);
+  await expect(page.getByText(/DABO TRANSPORT VOUS SOUHAITE/)).toHaveCount(0);
 
   const pendingDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "Télécharger le PDF" }).click();
@@ -88,7 +88,7 @@ test("Choisir un trajet puis obtenir le QR uniquement après paiement validé", 
   await page.getByRole("button", { name: "Actualiser le paiement" }).click();
   await expect(page.getByRole("heading", { name: "Votre e-ticket payé est prêt !" })).toBeVisible();
   await expect(page.getByRole("img", { name: "QR de vérification du ticket avant embarquement" })).toBeVisible();
-  await expect(page.getByText("Payé, DABO TRANSPORT vous souhaite un très bon voyage !!!!!!!!", { exact: true })).toBeVisible();
+  await expect(page.getByText("DABO TRANSPORT VOUS SOUHAITE UN TRES BON VOYAGE !!!", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Ouvrir la page de vérification" })).toHaveAttribute("href", `/verification/${qrToken}`);
   const paidDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "Télécharger le PDF" }).click();
@@ -98,6 +98,7 @@ test("Choisir un trajet puis obtenir le QR uniquement après paiement validé", 
   const paidPdf = Buffer.concat(paidChunks).toString("latin1");
   expect(paidPdf).toContain("/Subtype /Image");
   expect(paidPdf).toContain(`/verification/${qrToken}`);
+  expect(paidPdf).toContain("DABO TRANSPORT VOUS SOUHAITE UN TRES BON VOYAGE !!!");
 
   paid = false;
   await page.getByRole("button", { name: "Actualiser le paiement" }).click();
