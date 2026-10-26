@@ -1,18 +1,16 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, CalendarDays, MapPin, Search } from "lucide-react";
+import { ArrowRight, MapPin, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import TransportHeader from "@/components/TransportHeader";
 import HomeModules from "@/components/HomeModules";
 import TravelInformation from "@/components/TravelInformation";
+import TravelDatePicker from "@/components/TravelDatePicker";
 import { cities } from "@/lib/booking";
-
-const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
 export default function Index() {
   const [departure, setDeparture] = useState("Dakar");
@@ -75,11 +73,7 @@ export default function Index() {
             </div>
 
             <div className="mt-7 sm:mt-8">
-              <Label htmlFor="date" className={labelClass}>Date de voyage</Label>
-              <div className="relative mt-3">
-                <Input id="date" type="date" required min={today()} value={date} onChange={event => { setDate(event.target.value); setResult(null); }} className="h-20 min-w-0 rounded-2xl border-2 border-slate-200 bg-white pl-20 pr-4 text-base font-semibold text-brand-navy focus-visible:ring-brand-orange sm:h-24 sm:pl-24 sm:text-xl" />
-                <span aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-2xl bg-slate-100 text-brand-navy sm:left-5 sm:h-14 sm:w-14"><CalendarDays className="h-7 w-7 sm:h-8 sm:w-8" /></span>
-              </div>
+              <TravelDatePicker id="date" value={date} departure={departure} onChange={value => { setDate(value); setResult(null); }} />
             </div>
           </Card>
           <Button type="submit" className="mt-5 h-16 w-full rounded-2xl bg-brand-orange text-xl font-extrabold text-brand-navy shadow-sm hover:bg-orange-500 sm:h-20 sm:rounded-3xl sm:text-2xl"><Search className="mr-3 h-7 w-7" /> Rechercher</Button>
