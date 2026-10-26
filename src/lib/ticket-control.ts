@@ -13,7 +13,7 @@ export type ControlledTicket = {
   payment_status: string;
   payment_method: string;
   total_amount: number | null;
-  verification_token: string;
+  verification_token: string | null;
 };
 export type TicketFilters = { status: "ALL" | "PAID" | "PENDING"; date: string; departure: "ALL" | "Dakar" | "Ballou" };
 

@@ -13,12 +13,12 @@ Deno.serve(async req => {
     try { body = JSON.parse(text); } catch { return reply({ found: false }); }
     if (typeof body?.token !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.token)) return reply({ found: false });
     const client = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
-    const { data, error } = await client.from("reservations_dabo").select("departure_city,arrival_city,travel_date,seat_number,passenger_count,full_name,payment_method,payment_status,total_amount").eq("verification_token", body.token).maybeSingle();
+    const { data, error } = await client.from("reservations_dabo").select("departure_city,arrival_city,travel_date,seat_number,passenger_count,full_name,payment_method,payment_status,total_amount").eq("verification_token", body.token).eq("payment_status", "Payé").maybeSingle();
     if (error) throw error;
     if (!data) return reply({ found: false });
     const checkedAt = new Date().toISOString();
     const today = checkedAt.slice(0,10);
-    const state = data.travel_date < today ? "EXPIRED" : data.payment_status !== "Payé" ? "UNPAID" : data.travel_date > today ? "FUTURE" : "VALID_TODAY";
+    const state = data.travel_date < today ? "EXPIRED" : data.travel_date > today ? "FUTURE" : "VALID_TODAY";
     return reply({ found: true, state, checked_at: checkedAt, ticket: data });
   } catch {
     console.error("[dabo-ticket-check] Verification unavailable");

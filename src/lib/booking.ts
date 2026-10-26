@@ -50,7 +50,7 @@ export interface BookingTicket {
   payment_method: "Cash" | "Wave" | "OM";
   payment_status: string;
   total_amount: number;
-  verification_token: string;
+  verification_token: string | null;
 }
 export const formatTravelDate = (date: string) => new Date(`${date}T15:00:00Z`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 export const formatAmount = (amount: number) => `${amount.toLocaleString("fr-FR")} FCFA`;

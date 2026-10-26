@@ -1,14 +1,24 @@
 import { test, expect } from "@playwright/test";
 
-test("Choisir une date, ajuster les passagers et sélectionner un paiement", async ({ page }) => {
+test("Choisir un trajet puis obtenir le QR uniquement après paiement validé", async ({ page }) => {
   test.setTimeout(90000);
   page.setDefaultTimeout(10000);
   await page.setViewportSize({ width: 390, height: 844 });
-  // This test covers the selection UI; no live reservation or payment is created.
+  // Simulated server responses: no live reservation or payment is created.
+  let paid = false;
+  let bookingRequest = "";
+  const qrToken = "579b5acf-6d1a-4c10-8f87-8b371df794a0";
   await page.route("**/functions/v1/dabo-booking", async route => {
     const body = route.request().postDataJSON();
     if (body?.action === "availability") {
       await route.fulfill({ json: { taken: ["70"] } });
+    } else if (body?.action === "book") {
+      bookingRequest = body.request_id;
+      await route.fulfill({ json: { ticket: { ...body.data, ticket_id: `BSE-${body.request_id.replace(/-/g, "").toUpperCase()}`, seat_number: body.data.seats.join(", "), passenger_count: body.data.seats.length, total_amount: 24000, payment_status: "En attente", verification_token: null } } });
+    } else if (body?.action === "payment_status") {
+      expect(body.request_id).toBe(bookingRequest);
+      expect(body.phone).toBe("+221771234567");
+      await route.fulfill({ json: { payment_status: paid ? "Payé" : "En attente", verification_token: paid ? qrToken : null } });
     } else {
       await route.abort();
     }
@@ -58,5 +68,39 @@ test("Choisir une date, ajuster les passagers et sélectionner un paiement", asy
   await page.getByRole("button", { name: "Retour", exact: true }).click();
   await page.getByRole("button", { name: "Continuer", exact: true }).click();
   await expect(page.getByRole("radio", { name: "OM", exact: true })).toBeChecked();
-  await expect(page.getByRole("button", { name: "Confirmer le ticket" })).toBeVisible();
+  await page.getByRole("checkbox", { name: /J’ai vérifié les renseignements/ }).check();
+  await page.getByRole("button", { name: "Confirmer le ticket" }).click();
+  await expect(page.getByRole("heading", { name: "Votre réservation est enregistrée" })).toBeVisible();
+  await expect(page.getByText("Paiement en attente", { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("img", { name: "QR de vérification du ticket avant embarquement" })).toHaveCount(0);
+  await expect(page.getByText(/DABO TRANSPORT vous souhaite/)).toHaveCount(0);
+
+  const pendingDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Télécharger le PDF" }).click();
+  const pendingStream = await (await pendingDownload).createReadStream();
+  const pendingChunks: Buffer[] = [];
+  for await (const chunk of pendingStream!) pendingChunks.push(Buffer.from(chunk));
+  const pendingPdf = Buffer.concat(pendingChunks).toString("latin1");
+  expect(pendingPdf).not.toContain("/Subtype /Image");
+  expect(pendingPdf).not.toContain("/verification/");
+
+  paid = true;
+  await page.getByRole("button", { name: "Actualiser le paiement" }).click();
+  await expect(page.getByRole("heading", { name: "Votre e-ticket payé est prêt !" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "QR de vérification du ticket avant embarquement" })).toBeVisible();
+  await expect(page.getByText("Payé, DABO TRANSPORT vous souhaite un très bon voyage !!!!!!!!", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Ouvrir la page de vérification" })).toHaveAttribute("href", `/verification/${qrToken}`);
+  const paidDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Télécharger le PDF" }).click();
+  const paidStream = await (await paidDownload).createReadStream();
+  const paidChunks: Buffer[] = [];
+  for await (const chunk of paidStream!) paidChunks.push(Buffer.from(chunk));
+  const paidPdf = Buffer.concat(paidChunks).toString("latin1");
+  expect(paidPdf).toContain("/Subtype /Image");
+  expect(paidPdf).toContain(`/verification/${qrToken}`);
+
+  paid = false;
+  await page.getByRole("button", { name: "Actualiser le paiement" }).click();
+  await expect(page.getByRole("heading", { name: "Votre réservation est enregistrée" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "QR de vérification du ticket avant embarquement" })).toHaveCount(0);
 });
