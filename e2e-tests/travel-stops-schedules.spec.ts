@@ -21,7 +21,7 @@ test("Choisir les arrêts et horaires des deux trajets dans les deux sens", asyn
   await page.getByLabel("Départ *", { exact: true }).click();
   await page.getByRole("option", { name: "Ballou", exact: true }).click();
   await expect(schedule).toHaveText("Rendez-vous 07h00 • Départ 08h00");
-  await expect(page.getByRole("list", { name: "Arrêts du trajet" })).toHaveText("Ballou→Kidira→Tamba→Dakar");
+  await expect(page.getByRole("list", { name: "Arrêts du trajet" })).toHaveText("Ballou→Kidira→Goudiry→Tamba→Dakar");
   await page.getByRole("combobox", { name: "Ville de descente" }).click();
   await page.getByRole("option", { name: "Tamba", exact: true }).click();
   const date = new Date();
