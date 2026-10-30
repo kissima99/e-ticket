@@ -25,7 +25,7 @@ test("L’agent confirme le règlement puis télécharge et partage le PDF final
     } else if (body.action === "rewards") {
       await route.fulfill({ json: { rewards: [], total: 0 } });
     } else if (body.action === "list") {
-      await route.fulfill({ json: { tickets: [{ id: reservationId, ticket_id: filename.replace(".pdf", ""), created_at: new Date().toISOString(), full_name: "Voyageur Démonstration", departure_city: "Dakar", arrival_city: "Ballou", travel_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), seat_number: "1", passenger_count: 1, payment_status: paid ? "Payé" : "En attente", payment_method: "Wave", total_amount: 12000, verification_token: paid ? qrToken : null }], total: 1 } });
+      await route.fulfill({ json: { tickets: [{ id: reservationId, ticket_id: filename.replace(".pdf", ""), created_at: new Date().toISOString(), full_name: "Voyageur Démonstration", departure_city: "Dakar", arrival_city: "Ballou", route_id: "tamba_kidira", rendezvous_time: "05:00", departure_time: "06:00", travel_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), seat_number: "1", passenger_count: 1, payment_status: paid ? "Payé" : "En attente", payment_method: "Wave", total_amount: 12000, verification_token: paid ? qrToken : null }], total: 1 } });
     } else if (body.action === "confirm") {
       expect(body.reservation_id).toBe(reservationId);
       expect(route.request().headers()["x-agent-session"]).toBe("a".repeat(64));
@@ -34,7 +34,7 @@ test("L’agent confirme le règlement puis télécharge et partage le PDF final
     } else if (body.action === "paid_ticket") {
       expect(body.reservation_id).toBe(reservationId);
       expect(route.request().headers()["x-agent-session"]).toBe("a".repeat(64));
-      await route.fulfill(paid ? { json: { ticket: { ticket_id: filename.replace(".pdf", ""), full_name: "Voyageur Démonstration", phone: "+221771234567", departure_city: "Dakar", arrival_city: "Ballou", travel_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), seat_number: "1", passenger_count: 1, boarding_point: "Gare de Dakar", luggage_count: 1, payment_status: "Payé", payment_method: "Wave", total_amount: 12000, verification_token: qrToken } } } : { status: 409, json: { error: "Le PDF final avec QR est disponible uniquement après validation du paiement." } });
+      await route.fulfill(paid ? { json: { ticket: { ticket_id: filename.replace(".pdf", ""), full_name: "Voyageur Démonstration", phone: "+221771234567", departure_city: "Dakar", arrival_city: "Ballou", route_id: "tamba_kidira", rendezvous_time: "05:00", departure_time: "06:00", travel_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), seat_number: "1", passenger_count: 1, boarding_point: "Gare de Dakar", luggage_count: 1, payment_status: "Payé", payment_method: "Wave", total_amount: 12000, verification_token: qrToken } } } : { status: 409, json: { error: "Le PDF final avec QR est disponible uniquement après validation du paiement." } });
     } else {
       await route.abort();
     }
@@ -56,6 +56,7 @@ test("L’agent confirme le règlement puis télécharge et partage le PDF final
   await expect(whatsapp).toHaveAttribute("href", /^https:\/\/wa\.me\/221771234567\?text=/);
   const message = new URL((await whatsapp.getAttribute("href"))!).searchParams.get("text");
   expect(message).toContain(greeting);
+  expect(message).toContain("Rendez-vous 05h00 • Départ 06h00");
 
   const downloadEvent = page.waitForEvent("download");
   await page.getByRole("button", { name: "Télécharger le PDF final" }).click();
@@ -68,6 +69,8 @@ test("L’agent confirme le règlement puis télécharge et partage le PDF final
   expect(pdf).toContain("/Subtype /Image");
   expect(pdf).toContain(`/verification/${qrToken}`);
   expect(pdf).toContain(greeting);
+  expect(pdf).toContain("06h00");
+  expect(pdf).toContain("05h00");
   expect(pdf).not.toContain("Payé, DABO TRANSPORT");
 
   await page.getByRole("button", { name: "Partager le PDF via WhatsApp" }).click();

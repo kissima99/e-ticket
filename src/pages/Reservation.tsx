@@ -15,17 +15,24 @@ import TicketConfirmation from "@/components/TicketConfirmation";
 import PaymentLogo from "@/components/PaymentLogo";
 import TravelDatePicker from "@/components/TravelDatePicker";
 import PassengerCounter from "@/components/PassengerCounter";
-import { bookingSchema, cities, formatAmount, formatTravelDate, type BookingForm, type BookingTicket } from "@/lib/booking";
+import TravelRouteSelector from "@/components/TravelRouteSelector";
+import { routeStops, routeSchedule, ticketScheduleText, type TravelRouteId } from "@/lib/travel-routes";
+import { bookingSchema, formatAmount, formatTravelDate, type BookingForm, type BookingTicket } from "@/lib/booking";
 
-type Draft = Omit<BookingForm, "departure_city"> & { departure_city: string };
+type Draft = Omit<BookingForm, "departure_city" | "arrival_city" | "route_id"> & { departure_city: string; arrival_city: string; route_id: TravelRouteId };
 const stepNames = ["Trajet", "Voyageur", "Paiement", "Ticket"];
-const stepFields = [["departure_city", "arrival_city", "travel_date", "seats"], ["civility", "full_name", "phone", "identity_document_type", "identity_document_number", "emergency_contact", "boarding_point", "luggage_count"], ["payment_method", "promo_code"]];
+const stepFields = [["route_id", "departure_city", "arrival_city", "travel_date", "seats"], ["civility", "full_name", "phone", "identity_document_type", "identity_document_number", "emergency_contact", "boarding_point", "luggage_count"], ["payment_method", "promo_code"]];
 const inputClass = "h-12 rounded-xl border-slate-200 bg-white text-brand-navy focus-visible:ring-brand-orange";
 const actionClass = "h-12 rounded-xl bg-brand-orange px-6 font-bold text-brand-navy hover:bg-orange-500";
 
 export default function Reservation() {
   const [params] = useSearchParams();
-  const initial = (): Draft => ({ departure_city: ["Dakar", "Ballou"].includes(params.get("departure") || "") ? params.get("departure")! : "Dakar", arrival_city: cities.includes(params.get("arrival") || "") ? params.get("arrival")! : "Ballou", travel_date: /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") || "") ? params.get("date")! : "", seats: [""], civility: "M.", full_name: "", phone: "", identity_document_type: "CNI", identity_document_number: "", emergency_contact: "", boarding_point: "", luggage_count: 0, payment_method: "Cash" });
+  const initial = (): Draft => {
+    const route_id: TravelRouteId = params.get("route") === "tamba_kidira" ? "tamba_kidira" : "ouro_sogui";
+    const departure_city = params.get("departure") === "Ballou" ? "Ballou" : "Dakar";
+    const arrival_city = routeStops(route_id, departure_city).slice(1).includes(params.get("arrival") || "") ? params.get("arrival")! : departure_city === "Dakar" ? "Ballou" : "Dakar";
+    return { route_id, departure_city, arrival_city, travel_date: /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") || "") ? params.get("date")! : "", seats: [""], civility: "M.", full_name: "", phone: "", identity_document_type: "CNI", identity_document_number: "", emergency_contact: "", boarding_point: "", luggage_count: 0, payment_method: "Cash" };
+  };
   const [form, setForm] = useState<Draft>(initial);
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -45,14 +52,14 @@ export default function Reservation() {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(form.travel_date)) { setTaken([]); setChecking(false); setAvailabilityError(""); return; }
     let active = true;
     setChecking(true); setAvailabilityError("");
-    supabase.functions.invoke("dabo-booking", { body: { action: "availability", data: { departure_city: form.departure_city, travel_date: form.travel_date } } }).then(({ data, error }) => {
+    supabase.functions.invoke("dabo-booking", { body: { action: "availability", data: { route_id: form.route_id, departure_city: form.departure_city, travel_date: form.travel_date } } }).then(({ data, error }) => {
       if (!active) return;
       if (error || data?.error || !Array.isArray(data?.taken)) { setAvailabilityError("Impossible de vérifier les sièges. Réessayez avant de continuer."); setTaken([]); }
       else setTaken(data.taken);
       setChecking(false);
     }).catch(() => { if (active) { setChecking(false); setAvailabilityError("Vérification des sièges indisponible."); } });
     return () => { active = false; };
-  }, [form.departure_city, form.travel_date, refresh]);
+  }, [form.route_id, form.departure_city, form.travel_date, refresh]);
 
   function update<K extends keyof Draft>(key: K, value: Draft[K]) {
     setForm(previous => ({ ...previous, [key]: value }));
@@ -117,12 +124,10 @@ export default function Reservation() {
             <CardContent className="p-6 pt-4 sm:p-8 sm:pt-4">
               <form noValidate onSubmit={event => { event.preventDefault(); if (step < 3) navigate(step + 1); else void confirm(); }}>
                 {step === 1 && <div className="space-y-5">
-                  <div className="grid gap-5 sm:grid-cols-2">
-                    <div className="space-y-2"><Label htmlFor="departure_city">Départ *</Label><Select value={form.departure_city} onValueChange={value => { update("departure_city", value); setForm(previous => ({ ...previous, arrival_city: previous.arrival_city === value ? value === "Dakar" ? "Ballou" : "Dakar" : previous.arrival_city, seats: previous.seats.map(() => "") })); }}><SelectTrigger id="departure_city" className={inputClass}><SelectValue /></SelectTrigger><SelectContent>{["Dakar", "Ballou"].map(city => <SelectItem key={city} value={city}>{city}</SelectItem>)}</SelectContent></Select>{fieldError("departure_city")}</div>
-                    <div className="space-y-2"><Label htmlFor="arrival_city">Arrivée *</Label><Select value={form.arrival_city} onValueChange={value => update("arrival_city", value)}><SelectTrigger id="arrival_city" className={inputClass}><SelectValue /></SelectTrigger><SelectContent>{cities.filter(city => city !== form.departure_city).map(city => <SelectItem key={city} value={city}>{city}</SelectItem>)}</SelectContent></Select>{fieldError("arrival_city")}</div>
-                  </div>
+                  <TravelRouteSelector value={form} onChange={selection => { setForm(previous => ({ ...previous, ...selection, seats: previous.route_id !== selection.route_id || previous.departure_city !== selection.departure_city ? previous.seats.map(() => "") : previous.seats })); setErrors({}); setServerError(""); setAccepted(false); }} />
+                  {fieldError("route_id")}{fieldError("departure_city")}{fieldError("arrival_city")}
                   <div className="flex items-center justify-center gap-3 py-3 text-center"><span className="h-0.5 w-6 rounded-full bg-brand-orange" /><h2 className="text-2xl font-extrabold sm:text-3xl">{form.departure_city} vers {form.arrival_city}</h2><span className="h-0.5 w-6 rounded-full bg-brand-orange" /></div>
-                  <TravelDatePicker id="travel_date" value={form.travel_date} departure={form.departure_city} invalid={Boolean(errors.travel_date)} onChange={value => { update("travel_date", value); setForm(previous => ({ ...previous, seats: previous.seats.map(() => "") })); }} />
+                  <TravelDatePicker id="travel_date" value={form.travel_date} departure={form.departure_city} routeId={form.route_id} invalid={Boolean(errors.travel_date)} onChange={value => { update("travel_date", value); setForm(previous => ({ ...previous, seats: previous.seats.map(() => "") })); }} />
                   {fieldError("travel_date")}
                   <PassengerCounter count={form.seats.length} onChange={count => update("seats", Array.from({ length: count }, (_, index) => form.seats[index] || ""))} />
                   {checking && <p className="flex items-center gap-2 text-sm text-slate-600"><Loader2 className="h-4 w-4 animate-spin" /> Vérification des sièges…</p>}
@@ -137,7 +142,7 @@ export default function Reservation() {
                 </div>}
                 {step === 3 && <div className="space-y-6">
                   <RadioGroup aria-label="Mode de paiement" value={form.payment_method} onValueChange={value => update("payment_method", value as Draft["payment_method"])} className="gap-4 sm:gap-5">{[{ value: "Cash" as const, subtitle: "Espèces auprès de la compagnie" }, { value: "Wave" as const, subtitle: "Paiement mobile Wave" }, { value: "OM" as const, subtitle: "Orange Money" }].map(({ value, subtitle }) => <div key={value} className="relative"><RadioGroupItem id={`payment-${value}`} value={value} aria-label={value} className="peer sr-only" /><Label htmlFor={`payment-${value}`} className={`flex min-h-32 cursor-pointer items-center gap-4 rounded-3xl border bg-white p-4 shadow-[0_6px_22px_-12px_rgba(0,34,68,0.2)] transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-orange-700 sm:min-h-40 sm:gap-7 sm:p-6 ${form.payment_method === value ? "border-brand-orange ring-2 ring-brand-orange" : "border-orange-200 hover:border-brand-orange"}`}><PaymentLogo method={value} /><span className="min-w-0 flex-1"><span className="block text-3xl font-extrabold text-brand-navy sm:text-4xl">{value}</span><span className="mt-2 block text-xs font-normal leading-relaxed text-slate-600 sm:text-sm">{subtitle}</span></span>{form.payment_method === value ? <CheckCircle2 className="h-7 w-7 shrink-0 text-orange-600 sm:h-9 sm:w-9" aria-hidden="true" /> : <ChevronRight className="h-7 w-7 shrink-0 text-brand-orange sm:h-9 sm:w-9" aria-hidden="true" />}</Label></div>)}</RadioGroup>
-                  <div className="rounded-2xl bg-slate-50 p-5"><div className="mb-3 flex items-center justify-between"><h3 className="font-bold">Votre réservation</h3><Button variant="link" type="button" onClick={() => navigate(1)} className="h-auto p-0 text-orange-700">Modifier</Button></div><p className="font-semibold">{form.departure_city} → {form.arrival_city}</p><p className="mt-1 text-sm text-slate-600">{formatTravelDate(form.travel_date)} • 15h00</p><p className="mt-1 text-sm text-slate-600">{form.full_name} • Siège(s) {form.seats.join(", ")}</p><div className="mt-4 flex justify-between border-t border-slate-200 pt-3"><span>Total à régler</span><strong className="text-xl">{formatAmount(form.seats.length * 12000)}</strong></div></div>
+                  <div className="rounded-2xl bg-slate-50 p-5"><div className="mb-3 flex items-center justify-between"><h3 className="font-bold">Votre réservation</h3><Button variant="link" type="button" onClick={() => navigate(1)} className="h-auto p-0 text-orange-700">Modifier</Button></div><p className="font-semibold">{form.departure_city} → {form.arrival_city}</p><p className="mt-1 text-sm text-slate-600">{formatTravelDate(form.travel_date)} • {ticketScheduleText({ route_id: form.route_id, rendezvous_time: routeSchedule(form.route_id, form.departure_city).meeting, departure_time: routeSchedule(form.route_id, form.departure_city).departure })}</p><p className="mt-1 text-sm text-slate-600">{form.full_name} • Siège(s) {form.seats.join(", ")}</p><div className="mt-4 flex justify-between border-t border-slate-200 pt-3"><span>Total à régler</span><strong className="text-xl">{formatAmount(form.seats.length * 12000)}</strong></div></div>
                   <div className="space-y-2"><Label htmlFor="promo_code">Code réduction / carte cadeau (facultatif)</Label><Input id="promo_code" maxLength={50} value={form.promo_code || ""} onChange={event => update("promo_code", event.target.value.toUpperCase())} className={inputClass} placeholder="RED-… ou CADEAU-…" /><p className="text-xs text-slate-600">Le total ci-dessus est affiché avant réduction. Un code valide applique 15 % lors de la confirmation ; le montant final figure sur le ticket.</p>{fieldError("promo_code")}</div>
                   <p className="rounded-xl bg-orange-50 p-4 text-sm leading-relaxed text-orange-900">{form.payment_method === "Cash" ? "Le règlement en espèces est à effectuer auprès de DABO TRANSPORT avant l’embarquement." : `Le choix ${form.payment_method === "OM" ? "Orange Money" : "Wave"} sera enregistré. Aucun débit automatique n’est effectué ici : contactez la compagnie pour les instructions de règlement.`} Le ticket portera la mention « paiement en attente ».</p>
                   <label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed"><Checkbox checked={accepted} onCheckedChange={value => { setAccepted(value === true); setErrors({}); }} className="mt-1 border-orange-500 data-[state=checked]:bg-brand-navy" /><span>J’ai vérifié les renseignements et je comprends que le paiement reste à effectuer.</span></label>{fieldError("accepted")}

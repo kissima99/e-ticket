@@ -47,7 +47,7 @@ Deno.serve(async req => {
       return reply({ signed_out: true });
     }
     if (request.action === "paid_ticket") {
-      const { data, error } = await client.from("reservations_dabo").select("ticket_id,departure_city,arrival_city,travel_date,seat_number,passenger_count,full_name,phone,boarding_point,luggage_count,payment_method,payment_status,total_amount,verification_token").eq("id", request.reservation_id).maybeSingle();
+      const { data, error } = await client.from("reservations_dabo").select("ticket_id,departure_city,arrival_city,route_id,rendezvous_time,departure_time,travel_date,seat_number,passenger_count,full_name,phone,boarding_point,luggage_count,payment_method,payment_status,total_amount,verification_token").eq("id", request.reservation_id).maybeSingle();
       if (error) throw error;
       if (!data) return reply({ error: "Ticket introuvable." }, 404);
       if (data.payment_status !== "Payé" || !data.verification_token) return reply({ error: "Le PDF final avec QR est disponible uniquement après validation du paiement." }, 409);
@@ -85,7 +85,7 @@ Deno.serve(async req => {
       console.info("[dabo-ticket-control] Payment confirmation recorded", { reservation_id: request.reservation_id, agent_session_id: session.id, already_paid: data.already_paid });
       return reply(data);
     }
-    let query = client.from("reservations_dabo").select("id,ticket_id,created_at,full_name,departure_city,arrival_city,travel_date,seat_number,passenger_count,payment_status,payment_method,total_amount,verification_token", { count: "exact" });
+    let query = client.from("reservations_dabo").select("id,ticket_id,created_at,full_name,departure_city,arrival_city,route_id,rendezvous_time,departure_time,travel_date,seat_number,passenger_count,payment_status,payment_method,total_amount,verification_token", { count: "exact" });
     if (request.status !== "ALL") query = query.eq("payment_status", request.status === "PAID" ? "Payé" : "En attente");
     if (request.date) query = query.eq("travel_date", request.date);
     if (request.departure !== "ALL") query = query.eq("departure_city", request.departure);

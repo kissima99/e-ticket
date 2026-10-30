@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { TicketSchedule } from "@/lib/travel-routes";
 
-export type ControlledTicket = {
+export type ControlledTicket = TicketSchedule & {
   id: string;
   ticket_id: string;
   created_at: string;

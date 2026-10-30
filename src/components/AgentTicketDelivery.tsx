@@ -1,3 +1,4 @@
+import { ticketScheduleText } from "@/lib/travel-routes";
 import { useEffect, useState } from "react";
 import { Download, Loader2, MessageCircle, RefreshCw, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -61,7 +62,7 @@ export default function AgentTicketDelivery({ reservationId, onClose }: { reserv
   }
   const phone = prepared ? normalizePhone(prepared.ticket.phone) : "";
   const validPhone = /^\+[1-9]\d{7,14}$/.test(phone);
-  const message = prepared ? `Bonjour ${prepared.ticket.full_name}, voici votre ticket final DABO TRANSPORT.\n${prepared.ticket.departure_city} → ${prepared.ticket.arrival_city}\n${formatTravelDate(prepared.ticket.travel_date)} à 15h00\nSiège(s) : ${prepared.ticket.seat_number}\nVotre paiement a été validé par la compagnie. Le PDF joint contient votre QR final à présenter avant l’embarquement.\n${paidTicketMessage}` : "";
+  const message = prepared ? `Bonjour ${prepared.ticket.full_name}, voici votre ticket final DABO TRANSPORT.\n${prepared.ticket.departure_city} → ${prepared.ticket.arrival_city}\n${formatTravelDate(prepared.ticket.travel_date)} • ${ticketScheduleText(prepared.ticket)}\nSiège(s) : ${prepared.ticket.seat_number}\nVotre paiement a été validé par la compagnie. Le PDF joint contient votre QR final à présenter avant l’embarquement.\n${paidTicketMessage}` : "";
 
   return (
     <Dialog open onOpenChange={open => { if (!open && !sharing) onClose(); }}>

@@ -11,10 +11,13 @@ test("Choisir un trajet puis obtenir le QR uniquement après paiement validé", 
   await page.route("**/functions/v1/dabo-booking", async route => {
     const body = route.request().postDataJSON();
     if (body?.action === "availability") {
+      expect(body.data.route_id).toBe("ouro_sogui");
       await route.fulfill({ json: { taken: ["70"] } });
     } else if (body?.action === "book") {
       bookingRequest = body.request_id;
-      await route.fulfill({ json: { ticket: { ...body.data, ticket_id: `BSE-${body.request_id.replace(/-/g, "").toUpperCase()}`, seat_number: body.data.seats.join(", "), passenger_count: body.data.seats.length, total_amount: 24000, payment_status: "En attente", verification_token: null } } });
+      expect(body.data.route_id).toBe("ouro_sogui");
+      expect(body.data.arrival_city).toBe("Ouro Sogui");
+      await route.fulfill({ json: { ticket: { ...body.data, rendezvous_time: "12:00", departure_time: "14:00", ticket_id: `BSE-${body.request_id.replace(/-/g, "").toUpperCase()}`, seat_number: body.data.seats.join(", "), passenger_count: body.data.seats.length, total_amount: 24000, payment_status: "En attente", verification_token: null } } });
     } else if (body?.action === "payment_status") {
       expect(body.request_id).toBe(bookingRequest);
       expect(body.phone).toBe("+221771234567");
@@ -25,18 +28,24 @@ test("Choisir un trajet puis obtenir le QR uniquement après paiement validé", 
   });
   const date = new Date();
   date.setUTCDate(date.getUTCDate() + 10);
-  date.setUTCHours(15, 0, 0, 0);
-  while (date.getUTCDay() !== 2) date.setUTCDate(date.getUTCDate() + 1);
+  date.setUTCHours(12, 0, 0, 0);
+  while (date.getUTCDay() !== 1) date.setUTCDate(date.getUTCDate() + 1);
   const dateValue = date.toISOString().slice(0, 10);
   const dateName = date.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
   await page.goto("/");
+  await page.getByRole("combobox", { name: "Ville de descente" }).click();
+  await expect(page.getByRole("option", { name: "Tamba", exact: true })).toHaveCount(0);
+  await page.getByRole("option", { name: "Ouro Sogui", exact: true }).click();
+  await expect(page.getByTestId("route-schedule")).toHaveText("Rendez-vous 12h00 • Départ 14h00");
   await page.getByLabel("Choisir une autre date").fill(dateValue);
   await page.getByRole("button", { name: dateName, exact: true }).click();
   await expect(page.getByRole("button", { name: dateName, exact: true })).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Rechercher", exact: true }).click();
   await page.getByRole("link", { name: "Continuer la réservation" }).click();
   await expect(page.getByLabel("Choisir une autre date")).toHaveValue(dateValue);
+  await expect(page.getByRole("combobox", { name: "Ville de descente" })).toHaveText("Ouro Sogui");
+  await expect(page.getByTestId("route-schedule")).toHaveText("Rendez-vous 12h00 • Départ 14h00");
 
   await page.getByRole("button", { name: "Dates suivantes" }).click();
   await expect(page.getByRole("button", { name: dateName, exact: true })).toHaveCount(0);
@@ -83,6 +92,8 @@ test("Choisir un trajet puis obtenir le QR uniquement après paiement validé", 
   const pendingPdf = Buffer.concat(pendingChunks).toString("latin1");
   expect(pendingPdf).not.toContain("/Subtype /Image");
   expect(pendingPdf).not.toContain("/verification/");
+  expect(pendingPdf).toContain("14h00");
+  expect(pendingPdf).toContain("12h00");
 
   paid = true;
   await page.getByRole("button", { name: "Actualiser le paiement" }).click();

@@ -1,3 +1,4 @@
+import { ticketScheduleText } from "@/lib/travel-routes";
 import { jsPDF } from "jspdf";
 import { formatTravelDate, type BookingTicket } from "@/lib/booking";
 import { createTicketQr, hasPaidQr, paidTicketMessage, ticketVerificationUrl } from "@/lib/ticket-qr";
@@ -20,7 +21,7 @@ export async function createTicketPdf(ticket: BookingTicket) {
   doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.text(paid ? "Paiement validé par DABO TRANSPORT." : "Sans QR : paiement à valider par la compagnie.", 24, 98);
   const rows = [
     ["Trajet", `${ticket.departure_city} - ${ticket.arrival_city}`],
-    ["Date et heure", `${formatTravelDate(ticket.travel_date)} - 15h00`],
+    ["Date et heure", `${formatTravelDate(ticket.travel_date)} - ${ticketScheduleText(ticket)}`],
     ["Voyageur principal", ticket.full_name],
     ["Telephone", ticket.phone],
     ["Siege(s)", ticket.seat_number],
@@ -52,9 +53,10 @@ export async function createTicketPdf(ticket: BookingTicket) {
     doc.setTextColor("#FFFFFF"); doc.setFontSize(22); doc.text("Votre e-ticket", 105, 47, { align: "center" });
     doc.setFillColor("#FFFFFF"); doc.roundedRect(18, 57, 174, 212, 8, 8, "F");
     doc.setTextColor(navy); doc.setFontSize(22); doc.text(`${ticket.departure_city} vers ${ticket.arrival_city}`, 105, 77, { align: "center" });
-    doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.text(`${formatTravelDate(ticket.travel_date)} - 15h00`, 105, 88, { align: "center" });
-    doc.setDrawColor(orange); doc.setLineWidth(0.7); doc.line(33, 96, 177, 96);
-    doc.setFont("helvetica", "bold"); doc.setFontSize(17); doc.text("DABO TRANSPORT", 105, 108, { align: "center" });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.text(formatTravelDate(ticket.travel_date), 105, 87, { align: "center" });
+    doc.setFontSize(8); doc.text(doc.splitTextToSize(ticketScheduleText(ticket), 155), 105, 93, { align: "center" });
+    doc.setDrawColor(orange); doc.setLineWidth(0.7); doc.line(33, 100, 177, 100);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(17); doc.text("DABO TRANSPORT", 105, 110, { align: "center" });
     doc.setDrawColor(navy); doc.setLineWidth(0.7); doc.setLineDashPattern([0.5, 2], 0); doc.line(18, 117, 192, 117); doc.line(18, 221, 192, 221); doc.setLineDashPattern([], 0);
     doc.setFillColor(navy); for (const cutY of [117, 221]) { doc.circle(18, cutY, 6, "F"); doc.circle(192, cutY, 6, "F"); }
     doc.addImage(qrImage, "PNG", 64, 123, 82, 82);

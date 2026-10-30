@@ -1,3 +1,4 @@
+import { ticketScheduleText } from "@/lib/travel-routes";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { CheckCircle2, Clock3, Download, Loader2, MessageCircle, RefreshCw, Share2, Ticket } from "lucide-react";
@@ -22,7 +23,7 @@ export default function TicketConfirmation({ ticket: initialTicket, requestId, o
   const paid = verified && hasPaidQr(ticket);
   const loyaltyAccess = rememberedLoyaltyAccess(ticket.phone);
   const filename = `${ticket.ticket_id}.pdf`;
-  const message = `BALLOU SERVICE EXPRESS - DABO TRANSPORT\n${paid ? "E-ticket payé" : "Confirmation de réservation"}\nTicket : ${ticket.ticket_id}\n${ticket.departure_city} → ${ticket.arrival_city}\n${formatTravelDate(ticket.travel_date)} à 15h00\nVoyageur : ${ticket.full_name}\nSiège(s) : ${ticket.seat_number}\nPassagers : ${ticket.passenger_count}\nMontée : ${ticket.boarding_point}\nTotal : ${formatAmount(ticket.total_amount)}\nMode : ${ticket.payment_method}\nPaiement : ${verified ? ticket.payment_status : "À vérifier auprès de la compagnie"}\nPrésentez-vous 30 minutes avant le départ avec votre pièce d’identité.\n${paid ? paidTicketMessage : "Le QR sera disponible après validation du paiement par la compagnie."}`;
+  const message = `BALLOU SERVICE EXPRESS - DABO TRANSPORT\n${paid ? "E-ticket payé" : "Confirmation de réservation"}\nTicket : ${ticket.ticket_id}\n${ticket.departure_city} → ${ticket.arrival_city}\n${formatTravelDate(ticket.travel_date)} • ${ticketScheduleText(ticket)}\nVoyageur : ${ticket.full_name}\nSiège(s) : ${ticket.seat_number}\nPassagers : ${ticket.passenger_count}\nMontée : ${ticket.boarding_point}\nTotal : ${formatAmount(ticket.total_amount)}\nMode : ${ticket.payment_method}\nPaiement : ${verified ? ticket.payment_status : "À vérifier auprès de la compagnie"}\nPrésentez-vous 30 minutes avant le départ avec votre pièce d’identité.\n${paid ? paidTicketMessage : "Le QR sera disponible après validation du paiement par la compagnie."}`;
 
   const refreshTicket = useCallback(async () => {
     setRefreshing(true);
@@ -80,7 +81,7 @@ export default function TicketConfirmation({ ticket: initialTicket, requestId, o
     <div>
       <div className="mb-6 text-center" role="status">{paid ? <CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-green-700" /> : <Clock3 className="mx-auto mb-3 h-12 w-12 text-orange-700" />}<h1 className="text-2xl font-extrabold text-brand-navy sm:text-3xl">{paid ? "Votre e-ticket payé est prêt !" : "Votre réservation est enregistrée"}</h1><p className="mt-2 text-sm text-slate-600">{paid ? "Le paiement a été validé par DABO TRANSPORT." : "Le QR sera disponible après validation du paiement par l’agent ou la compagnie."}</p></div>
       <Card className="overflow-hidden rounded-3xl border-slate-200 bg-white shadow-sm">
-        <div className="bg-brand-navy p-6 text-white"><div className="mb-4 flex items-center justify-between"><p className="text-xs font-bold tracking-[0.16em]">BALLOU <span className="text-brand-orange">SERVICE EXPRESS</span></p><Ticket className="h-6 w-6 text-brand-orange" /></div><h2 className="text-2xl font-bold">{ticket.departure_city} <span className="text-brand-orange">→</span> {ticket.arrival_city}</h2><p className="mt-2 text-sm text-slate-200">{formatTravelDate(ticket.travel_date)} • 15h00</p></div>
+        <div className="bg-brand-navy p-6 text-white"><div className="mb-4 flex items-center justify-between"><p className="text-xs font-bold tracking-[0.16em]">BALLOU <span className="text-brand-orange">SERVICE EXPRESS</span></p><Ticket className="h-6 w-6 text-brand-orange" /></div><h2 className="text-2xl font-bold">{ticket.departure_city} <span className="text-brand-orange">→</span> {ticket.arrival_city}</h2><p className="mt-2 text-sm text-slate-200">{formatTravelDate(ticket.travel_date)} • {ticketScheduleText(ticket)}</p></div>
         <CardContent className="p-6 sm:p-8">
           <p className="text-xs uppercase tracking-wider text-slate-500">Numéro de ticket</p><p className="mb-6 mt-1 break-all font-mono text-sm font-bold text-brand-navy sm:text-base">{ticket.ticket_id}</p>
           {paid ? <TicketQr ticket={ticket} /> : <div className="mb-6 rounded-2xl border border-orange-200 bg-orange-50 p-5 text-orange-900"><p className="font-bold">{verified ? "Paiement en attente" : "Paiement à vérifier"}</p><p className="mt-2 text-sm leading-relaxed">Aucun QR n’est délivré avant confirmation du règlement réel par DABO TRANSPORT. Le ticket s’actualise automatiquement sur cette page.</p></div>}
