@@ -1,13 +1,13 @@
 export const travelRoutes = {
-  ouro_sogui: { label: "Via Ouro Sogui", stops: ["Dakar", "Ouro Sogui", "Ballou"], Dakar: { meeting: "12:00", departure: "14:00" }, Ballou: { meeting: "06:00", departure: "08:00" } },
-  tamba_kidira: { label: "Via Tamba – Kidira", stops: ["Dakar", "Tamba", "Goudiry", "Kidira", "Ballou"], Dakar: { meeting: "05:00", departure: "06:00" }, Ballou: { meeting: "07:00", departure: "08:00" } },
+  ouro_sogui: { label: "Via Ouro Sogui", stops: ["Dakar", "Touba", "Dara Djolof", "Ranérou", "Sèmè", "Hamedi Hounaré", "Bondji", "Bakel", "Bema", "Gabou", "Sare", "Ouro Sogui", "Ballou"], Dakar: { meeting: "12:00", departure: "14:00" }, Ballou: { meeting: "06:00", departure: "08:00" } },
+  tamba_kidira: { label: "Via Tamba – Kidira", stops: ["Dakar", "Kaolack", "Fatick", "Tamba", "Goudiry", "Kidira", "Wour Thierna", "Ballou"], Dakar: { meeting: "05:00", departure: "06:00" }, Ballou: { meeting: "07:00", departure: "08:00" } },
 } as const;
+export type TravelRouteId = keyof typeof travelRoutes;
 export const travelFares: Record<string, Record<string, number>> = {
   Dakar: { "Ouro Sogui": 10000, Tamba: 8000, Goudiry: 11000, Kidira: 11000, Ballou: 12000 },
   Ballou: { "Ouro Sogui": 10000, Kidira: 1500, Goudiry: 5000, Tamba: 6000, Dakar: 12000 },
 };
-export const getTravelFare = (departure: string, arrival: string) => travelFares[departure][arrival];
-export type TravelRouteId = keyof typeof travelRoutes;
+export const getTravelFare = (departure: string, arrival: string) => travelFares[departure]?.[arrival];
 export const departureDays = [1, 2, 4, 6];
 export const departureDaysLabel = "Lundi, mardi, jeudi et samedi";
 export function routeStops(route: TravelRouteId, departure: string): string[] {
