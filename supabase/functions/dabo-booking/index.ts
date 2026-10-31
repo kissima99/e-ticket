@@ -2,10 +2,22 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { z } from "https://esm.sh/zod@3.25.76";
 
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
-const cities = ["Dakar", "Ouro Sogui", "Tamba", "Goudiry", "Kidira", "Ballou"];
+const routes: Record<string, Record<string, string[]>> = {
+  ouro_sogui: {
+    Dakar: ["Ouro Sogui", "Touba", "Dara Djolof", "Ranérou", "Sèmè", "Hamédi Hounaré", "Bondji", "Bakel", "Béma", "Gabou", "Saré", "Ballou"],
+    Ballou: ["Saré", "Gabou", "Béma", "Bakel", "Bondji", "Hamédi Hounaré", "Sèmè", "Ranérou", "Dara Djolof", "Touba", "Ouro Sogui", "Dakar"],
+  },
+  tamba_kidira: {
+    Dakar: ["Kaolack", "Fatick", "Tamba", "Goudiry", "Kidira", "Wour Thierna", "Ballou"],
+    Ballou: ["Wour Thierna", "Kidira", "Goudiry", "Tamba", "Fatick", "Kaolack", "Dakar"],
+  },
+};
+const cities = [...new Set(Object.values(routes).flatMap(directions => Object.values(directions).flat()))];
 const phone = z.string().trim().regex(/^\+[1-9]\d{7,14}$/);
 const routeSchema = z.object({ route_id: z.enum(["ouro_sogui", "tamba_kidira"]), departure_city: z.enum(["Dakar", "Ballou"]), travel_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => { const d = new Date(`${value}T12:00:00Z`); return Number.isFinite(d.getTime()) && d.toISOString().slice(0,10) === value; }) });
-const bookingSchema = routeSchema.extend({ arrival_city: z.string().refine(value => cities.includes(value)), seats: z.array(z.string().regex(/^([1-9]|[1-6][0-9]|70)$/)).min(1).max(5).refine(value => new Set(value).size === value.length), civility: z.enum(["M.", "Mme", "Mlle"]), full_name: z.string().trim().min(2).max(100), phone, identity_document_type: z.enum(["CNI", "Passeport"]), identity_document_number: z.string().trim().min(3).max(50), emergency_contact: phone, boarding_point: z.string().trim().min(3).max(150), luggage_count: z.number().int().min(0).max(5), payment_method: z.enum(["Cash", "Wave", "OM"]), promo_code: z.string().trim().toUpperCase().max(50).optional() });
+const bookingSchema = routeSchema.extend({ arrival_city: z.string(), seats: z.array(z.string().regex(/^([1-9]|[1-6][0-9]|70)$/)).min(1).max(5).refine(value => new Set(value).size === value.length), civility: z.enum(["M.", "Mme", "Mlle"]), full_name: z.string().trim().min(2).max(100), phone, identity_document_type: z.enum(["CNI", "Passeport"]), identity_document_number: z.string().trim().min(3).max(50), emergency_contact: phone, boarding_point: z.string().trim().min(3).max(150), luggage_count: z.number().int().min(0).max(5), payment_method: z.enum(["Cash", "Wave", "OM"]), promo_code: z.string().trim().toUpperCase().max(50).optional() }).superRefine((data, context) => {
+  if (!routes[data.route_id][data.departure_city].includes(data.arrival_city)) context.addIssue({ code: "custom", path: ["arrival_city"], message: "Arrêt invalide pour ce trajet." });
+});
 const requestSchema = z.discriminatedUnion("action", [z.object({ action: z.literal("availability"), data: routeSchema }), z.object({ action: z.literal("book"), request_id: z.string().uuid(), data: bookingSchema }), z.object({ action: z.literal("payment_status"), request_id: z.string().uuid(), phone })]);
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" } });
 
