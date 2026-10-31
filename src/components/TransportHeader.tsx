@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, MessageCircle } from "lucide-react";
+import { ArrowLeft, MessageCircle, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
@@ -26,8 +26,12 @@ export default function TransportHeader({ back = false, children }: { back?: boo
           </DialogTrigger>
           <DialogContent className="rounded-3xl text-brand-navy">
             <DialogHeader><DialogTitle>Contacter DABO TRANSPORT</DialogTitle></DialogHeader>
-            <p className="text-sm leading-relaxed text-slate-600">Pour une question concernant votre voyage, adressez-vous au guichet de la compagnie à votre point de montée. Conservez votre numéro de ticket pour faciliter le suivi.</p>
-            <p className="rounded-xl bg-orange-50 p-4 text-sm text-orange-900">Aucun numéro de contact ou WhatsApp officiel n’a encore été renseigné sur cette application.</p>
+            <p className="text-sm leading-relaxed text-slate-600">Pour une question concernant votre voyage, contactez DABO TRANSPORT ou conservez votre numéro de ticket pour faciliter le suivi.</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <a href="tel:+221773025008" className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 font-bold text-brand-navy transition-colors hover:border-brand-orange hover:bg-orange-50"><Phone className="h-5 w-5 text-brand-orange" />77 302 50 08</a>
+              <a href="tel:+221783395154" className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 font-bold text-brand-navy transition-colors hover:border-brand-orange hover:bg-orange-50"><Phone className="h-5 w-5 text-brand-orange" />78 339 51 54</a>
+            </div>
+            <Button asChild className="h-12 rounded-xl bg-green-700 font-bold text-white hover:bg-green-800"><a href="https://wa.me/221782254545?text=Bonjour%20DABO%20TRANSPORT%2C%20je%20souhaite%20traiter%20une%20r%C3%A9clamation." target="_blank" rel="noopener noreferrer"><MessageCircle /> WhatsApp réclamations — 78 225 45 45</a></Button>
           </DialogContent>
         </Dialog>
       </div>
