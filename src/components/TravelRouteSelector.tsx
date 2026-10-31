@@ -11,7 +11,7 @@ export default function TravelRouteSelector({ value, onChange, home = false }: {
   const fieldClass = "h-12 rounded-xl border-slate-200 bg-white font-semibold text-brand-navy focus:ring-brand-orange";
   const homeFieldClass = "h-20 rounded-2xl border-2 border-slate-200 bg-white pl-20 pr-5 text-2xl font-bold text-brand-navy focus:ring-brand-orange sm:h-24 sm:pl-24 sm:text-3xl [&>svg]:h-6 [&>svg]:w-6 [&>svg]:opacity-100";
   function change(next: Selection) {
-    if (!routeStops(next.route_id, next.departure_city).slice(1).includes(next.arrival_city)) next.arrival_city = next.departure_city === "Dakar" ? "Ballou" : "Dakar";
+    if (!routeArrivalCities(next.route_id, next.departure_city).includes(next.arrival_city)) next.arrival_city = next.departure_city === "Dakar" ? "Ballou" : "Dakar";
     onChange(next);
   }
   const routeField = <div className="space-y-2"><Label htmlFor="route_id" className={home ? "text-sm font-bold text-brand-navy" : ""}>Trajet *</Label><Select value={value.route_id} onValueChange={route => change({ ...value, route_id: route as TravelRouteId })}><SelectTrigger id="route_id" className={fieldClass}><SelectValue /></SelectTrigger><SelectContent>{Object.entries(travelRoutes).map(([id, route]) => <SelectItem key={id} value={id}>{route.label}</SelectItem>)}</SelectContent></Select></div>;

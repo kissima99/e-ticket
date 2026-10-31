@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { isTravelDateAvailable, routeArrivalCities, routeStops, type TicketSchedule } from "@/lib/travel-routes";
 
-export const cities = ["Dakar", "Ouro Sogui", "Tamba", "Goudiry", "Kidira", "Ballou", "Touba", "Dara Djolof", "Sèmè", "Bakel", "Bema", "Gabou", "Sarré", "Kaolack", "Fatick", "Wour Thierna"];
+export const cities = ["Dakar", "Ouro Sogui", "Tamba", "Goudiry", "Kidira", "Ballou", "Touba", "Dara Djolof", "Ranérou", "Sèmè", "Hamédi Hounaré", "Bondji", "Bakel", "Béma", "Gabou", "Saré", "Kaolack", "Fatick", "Wour Thierna"];
 export const normalizePhone = (value: string) => {
   let phone = value.replace(/[\s().-]/g, "");
   if (phone.startsWith("00")) phone = `+${phone.slice(2)}`;

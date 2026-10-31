@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { z } from "https://esm.sh/zod@3.25.76";
 
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
-const cities = ["Dakar", "Ouro Sogui", "Tamba", "Goudiry", "Kidira", "Ballou"];
+const cities = ["Dakar", "Ouro Sogui", "Touba", "Dara Djolof", "Ranérou", "Sèmè", "Hamédi Hounaré", "Bondji", "Bakel", "Béma", "Gabou", "Saré", "Tamba", "Goudiry", "Kidira", "Wour Thierna", "Ballou", "Kaolack", "Fatick"];
 const phone = z.string().trim().regex(/^\+[1-9]\d{7,14}$/);
 const routeSchema = z.object({ route_id: z.enum(["ouro_sogui", "tamba_kidira"]), departure_city: z.enum(["Dakar", "Ballou"]), travel_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => { const d = new Date(`${value}T12:00:00Z`); return Number.isFinite(d.getTime()) && d.toISOString().slice(0,10) === value; }) });
 const bookingSchema = routeSchema.extend({ arrival_city: z.string().refine(value => cities.includes(value)), seats: z.array(z.string().regex(/^([1-9]|[1-6][0-9]|70)$/)).min(1).max(5).refine(value => new Set(value).size === value.length), civility: z.enum(["M.", "Mme", "Mlle"]), full_name: z.string().trim().min(2).max(100), phone, identity_document_type: z.enum(["CNI", "Passeport"]), identity_document_number: z.string().trim().min(3).max(50), emergency_contact: phone, boarding_point: z.string().trim().min(3).max(150), luggage_count: z.number().int().min(0).max(5), payment_method: z.enum(["Cash", "Wave", "OM"]), promo_code: z.string().trim().toUpperCase().max(50).optional() });

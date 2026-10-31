@@ -22,7 +22,7 @@ export type AgentSession = { token: string; expires_at: string };
 export class AgentSessionExpiredError extends Error {}
 
 export type RewardRequest = { id: string; account_phone: string; phone: string; operator: string; reward_type: string; status: string; amount_fcfa: number | null; fulfillment_reference: string | null; fulfilled_at: string | null; created_at: string };
-type Request = { action: "login"; code: string } | { action: "access" | "logout" } | ({ action: "list"; page: number } & TicketFilters) | { action: "confirm" | "paid_ticket"; reservation_id: string } | { action: "rewards"; page: number; status: "ALL" | "PENDING" | "FULFILLED" } | { action: "fulfill_reward"; reward_id: string; reference?: string; confirmed: true };
+type Request = { action: "login"; code: string } | { action: "access" | "logout" } | ({ action: "list"; page: number } & TicketFilters) | { action: "confirm"; reservation_id: string; amount: number } | { action: "paid_ticket"; reservation_id: string } | { action: "rewards"; page: number; status: "ALL" | "PENDING" | "FULFILLED" } | { action: "fulfill_reward"; reward_id: string; reference?: string; confirmed: true };
 export async function ticketControlRequest<T>(request: Request, token?: string): Promise<T> {
   const { data, error } = await supabase.functions.invoke("dabo-ticket-control", { body: request, headers: token ? { "x-agent-session": token } : {} });
   if (error) {
