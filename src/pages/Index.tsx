@@ -9,7 +9,7 @@ import HomeModules from "@/components/HomeModules";
 import TravelInformation from "@/components/TravelInformation";
 import TravelDatePicker from "@/components/TravelDatePicker";
 import TravelRouteSelector from "@/components/TravelRouteSelector";
-import { formatPrice, formatTravelDate } from "@/lib/booking";
+import { formatAmount, formatTravelDate } from "@/lib/booking";
 import { getTravelFare, isTravelDateAvailable, routeSchedule, ticketScheduleText, type TravelRouteId } from "@/lib/travel-routes";
 
 type Selection = { route_id: TravelRouteId; departure_city: string; arrival_city: string };
@@ -40,7 +40,7 @@ export default function Index() {
           <div className="mt-7 sm:mt-8"><TravelDatePicker id="date" value={date} departure={selection.departure_city} routeId={selection.route_id} onChange={value => { setDate(value); setResult(null); }} /></div>
         </Card>
         <Button type="submit" className="mt-5 h-16 w-full rounded-2xl bg-brand-orange text-xl font-extrabold text-brand-navy shadow-sm hover:bg-orange-500 sm:h-20 sm:rounded-3xl sm:text-2xl"><Search className="mr-3 h-7 w-7" /> Rechercher</Button>
-        <p className="mt-4 text-center text-sm leading-relaxed text-slate-600"><strong data-testid="home-fare" className="font-bold text-brand-navy">{getTravelFare(selection.departure_city, selection.arrival_city) === undefined ? "Prix à définir par l’agent de la compagnie" : `${formatPrice(getTravelFare(selection.departure_city, selection.arrival_city))} par personne`}</strong> • {ticketScheduleText({ route_id: selection.route_id, rendezvous_time: schedule.meeting, departure_time: schedule.departure })}</p>
+        <p className="mt-4 text-center text-sm leading-relaxed text-slate-600"><strong data-testid="home-fare" className="font-bold text-brand-navy">{formatAmount(getTravelFare(selection.departure_city, selection.arrival_city))} par personne</strong> • {ticketScheduleText({ route_id: selection.route_id, rendezvous_time: schedule.meeting, departure_time: schedule.departure })}</p>
       </form>
       {result && <div ref={resultRef} aria-live="polite" className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 sm:p-6">
         {result.available ? <div>

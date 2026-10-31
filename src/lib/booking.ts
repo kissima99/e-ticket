@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { getTravelFare, isTravelDateAvailable, routeStops, travelRoutes, type TicketSchedule } from "@/lib/travel-routes";
+import { isTravelDateAvailable, routeStops, type TicketSchedule } from "@/lib/travel-routes";
 
-export const cities = [...new Set(Object.values(travelRoutes).flatMap(route => route.stops))];
+export const cities = ["Dakar", "Ouro Sogui", "Tamba", "Goudiry", "Kidira", "Ballou"];
 export const normalizePhone = (value: string) => {
   let phone = value.replace(/[\s().-]/g, "");
   if (phone.startsWith("00")) phone = `+${phone.slice(2)}`;
@@ -31,7 +31,6 @@ export const paymentSchema = z.object({ payment_method: z.enum(["Cash", "Wave", 
 export const bookingSchema = routeSchema.merge(passengerSchema).merge(paymentSchema).superRefine((data, context) => {
   if (!routeStops(data.route_id, data.departure_city).slice(1).includes(data.arrival_city)) context.addIssue({ code: "custom", path: ["arrival_city"], message: "Choisissez un arrêt de descente sur ce trajet." });
   if (!isTravelDateAvailable(data.travel_date, data.route_id, data.departure_city)) context.addIssue({ code: "custom", path: ["travel_date"], message: "Choisissez un départ futur : lundi, mardi, jeudi ou samedi, selon l’horaire du trajet." });
-  if (getTravelFare(data.departure_city, data.arrival_city) === undefined && !data.promo_code) context.addIssue({ code: "custom", path: ["arrival_city"], message: "Le tarif de cet arrêt sera fixé par l’agent avant la confirmation du paiement." });
 });
 export type BookingForm = z.input<typeof bookingSchema>;
 export interface BookingTicket extends TicketSchedule {
@@ -47,9 +46,8 @@ export interface BookingTicket extends TicketSchedule {
   luggage_count: number;
   payment_method: "Cash" | "Wave" | "OM";
   payment_status: string;
-  total_amount: number | null;
+  total_amount: number;
   verification_token: string | null;
 }
 export const formatTravelDate = (date: string) => new Date(`${date}T15:00:00Z`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 export const formatAmount = (amount: number) => `${amount.toLocaleString("fr-FR")} FCFA`;
-export const formatPrice = (amount: number | null | undefined) => amount === null || amount === undefined ? "Prix à définir par l’agent" : formatAmount(amount);
