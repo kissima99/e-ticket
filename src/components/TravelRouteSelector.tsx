@@ -1,11 +1,12 @@
 import { MapPin } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatTime, routeSchedule, routeStops, travelRoutes, type TravelRouteId } from "@/lib/travel-routes";
+import { formatTime, routeArrivalCities, routeSchedule, routeStops, travelRoutes, type TravelRouteId } from "@/lib/travel-routes";
 
 type Selection = { route_id: TravelRouteId; departure_city: string; arrival_city: string };
 export default function TravelRouteSelector({ value, onChange, home = false }: { value: Selection; onChange: (value: Selection) => void; home?: boolean }) {
   const stops = routeStops(value.route_id, value.departure_city);
+  const arrivals = routeArrivalCities(value.route_id, value.departure_city);
   const schedule = routeSchedule(value.route_id, value.departure_city);
   const fieldClass = "h-12 rounded-xl border-slate-200 bg-white font-semibold text-brand-navy focus:ring-brand-orange";
   const homeFieldClass = "h-20 rounded-2xl border-2 border-slate-200 bg-white pl-20 pr-5 text-2xl font-bold text-brand-navy focus:ring-brand-orange sm:h-24 sm:pl-24 sm:text-3xl [&>svg]:h-6 [&>svg]:w-6 [&>svg]:opacity-100";
@@ -21,7 +22,7 @@ export default function TravelRouteSelector({ value, onChange, home = false }: {
         {home && index === 1 && <div aria-hidden="true" className="relative ml-10 h-10 border-l-2 border-dashed border-brand-navy/50 sm:ml-12"><span className="absolute -left-[5px] top-0 h-2 w-2 rounded-full bg-brand-navy" /><span className="absolute -bottom-1 -left-[5px] h-2 w-2 rounded-full bg-brand-orange" /></div>}
         <Label htmlFor={key} className={home ? "block pl-20 text-lg font-bold text-brand-navy sm:pl-24 sm:text-xl" : ""}>{index === 0 ? "Départ *" : home ? <>Destination<span className="sr-only"> — Ville de descente *</span></> : "Ville de descente *"}</Label>
         <div className={home ? "relative mt-3" : "mt-2"}>
-          <Select key={index === 0 ? key : `${value.route_id}-${value.departure_city}`} value={value[key]} onValueChange={city => change({ ...value, [key]: city })}><SelectTrigger id={key} className={home ? homeFieldClass : fieldClass}><SelectValue /></SelectTrigger><SelectContent className="rounded-2xl border-slate-200 bg-white text-brand-navy">{(index === 0 ? ["Dakar", "Ballou"] : stops.slice(1)).map(city => <SelectItem key={city} value={city} className={home ? "rounded-lg py-3 text-lg" : ""}>{city}</SelectItem>)}</SelectContent></Select>
+          <Select key={index === 0 ? key : `${value.route_id}-${value.departure_city}`} value={value[key]} onValueChange={city => change({ ...value, [key]: city })}><SelectTrigger id={key} className={home ? homeFieldClass : fieldClass}><SelectValue /></SelectTrigger><SelectContent className="rounded-2xl border-slate-200 bg-white text-brand-navy">{(index === 0 ? ["Dakar", "Ballou"] : arrivals).map(city => <SelectItem key={city} value={city} className={home ? "rounded-lg py-3 text-lg" : ""}>{city}</SelectItem>)}</SelectContent></Select>
           {home && <span aria-hidden="true" className={`pointer-events-none absolute left-4 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-2xl sm:left-5 sm:h-14 sm:w-14 ${index === 0 ? "bg-brand-navy text-white" : "bg-brand-orange text-brand-navy"}`}><MapPin className="h-7 w-7 sm:h-8 sm:w-8" /></span>}
         </div>
       </div>)}

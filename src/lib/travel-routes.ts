@@ -1,18 +1,29 @@
 export const travelRoutes = {
-  ouro_sogui: { label: "Via Ouro Sogui", stops: ["Dakar", "Ouro Sogui", "Ballou"], Dakar: { meeting: "12:00", departure: "14:00" }, Ballou: { meeting: "06:00", departure: "08:00" } },
-  tamba_kidira: { label: "Via Tamba – Kidira", stops: ["Dakar", "Tamba", "Goudiry", "Kidira", "Ballou"], Dakar: { meeting: "05:00", departure: "06:00" }, Ballou: { meeting: "07:00", departure: "08:00" } },
+  ouro_sogui: {
+    label: "Via Ouro Sogui",
+    stops: ["Dakar", "Ouro Sogui", "Ballou"],
+    extra_stops: ["Touba", "Dara Djolof", "Ranérou", "Sèmè", "Hamédi Hounaré", "Bondji", "Bakel", "Béma", "Gabou", "Saré"],
+    Dakar: { meeting: "12:00", departure: "14:00" },
+    Ballou: { meeting: "06:00", departure: "08:00" },
+  },
+  tamba_kidira: {
+    label: "Via Tamba – Kidira",
+    stops: ["Dakar", "Tamba", "Goudiry", "Kidira", "Ballou"],
+    extra_stops: ["Kaolack", "Fatick", "Wour Thierna"],
+    Dakar: { meeting: "05:00", departure: "06:00" },
+    Ballou: { meeting: "07:00", departure: "08:00" },
+  },
 } as const;
-export const travelFares: Record<string, Record<string, number>> = {
-  Dakar: { "Ouro Sogui": 10000, Tamba: 8000, Goudiry: 11000, Kidira: 11000, Ballou: 12000 },
-  Ballou: { "Ouro Sogui": 10000, Kidira: 1500, Goudiry: 5000, Tamba: 6000, Dakar: 12000 },
-};
-export const getTravelFare = (departure: string, arrival: string) => travelFares[departure][arrival];
 export type TravelRouteId = keyof typeof travelRoutes;
 export const departureDays = [1, 2, 4, 6];
 export const departureDaysLabel = "Lundi, mardi, jeudi et samedi";
 export function routeStops(route: TravelRouteId, departure: string): string[] {
   const stops = [...travelRoutes[route].stops];
   return departure === "Ballou" ? stops.reverse() : stops;
+}
+export function routeArrivalCities(route: TravelRouteId, departure: string): string[] {
+  const stops = routeStops(route, departure);
+  return [...stops.slice(1), ...travelRoutes[route].extra_stops];
 }
 export const routeSchedule = (route: TravelRouteId, departure: string) => travelRoutes[route][departure === "Ballou" ? "Ballou" : "Dakar"];
 export const formatTime = (time: string) => time.slice(0, 5).replace(":", "h");
@@ -25,4 +36,24 @@ export function isTravelDateAvailable(date: string, route: TravelRouteId, depart
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
   const d = new Date(`${date}T${routeSchedule(route, departure).departure}:00Z`);
   return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === date && d.getTime() > Date.now() && departureDays.includes(d.getUTCDay());
+}
+export const travelFares: Record<string, Record<string, number>> = {
+  Dakar: {
+    "Ouro Sogui": 10000,
+    Tamba: 8000,
+    Goudiry: 11000,
+    Kidira: 11000,
+    Ballou: 12000,
+  },
+  Ballou: {
+    "Ouro Sogui": 10000,
+    Kidira: 1500,
+    Tamba: 6000,
+    Goudiry: 5000,
+    Dakar: 12000,
+  },
+};
+export function getTravelFare(departure: string, arrival: string): number {
+  const fares = travelFares[departure]?.[arrival];
+  return fares ?? 12000;
 }

@@ -15,9 +15,12 @@ test("Choisir les arrêts et horaires des deux trajets dans les deux sens", asyn
   await page.getByRole("option", { name: "Via Tamba – Kidira", exact: true }).click();
   await expect(schedule).toHaveText("Rendez-vous 05h00 • Départ 06h00");
   await page.getByRole("combobox", { name: "Ville de descente" }).click();
-  await expect(page.getByRole("option", { name: "Ouro Sogui", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("option", { name: "Tamba", exact: true })).toBeVisible();
-  await page.getByRole("option", { name: "Kidira", exact: true }).click();
+    await expect(page.getByRole("option", { name: "Ouro Sogui", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("option", { name: "Tamba", exact: true })).toBeVisible();
+    await expect(page.getByRole("option", { name: "Kaolack", exact: true })).toBeVisible();
+    await expect(page.getByRole("option", { name: "Fatick", exact: true })).toBeVisible();
+    await expect(page.getByRole("option", { name: "Wour Thierna", exact: true })).toBeVisible();
+    await page.getByRole("option", { name: "Kidira", exact: true }).click();
   await page.getByLabel("Départ *", { exact: true }).click();
   await page.getByRole("option", { name: "Ballou", exact: true }).click();
   await expect(schedule).toHaveText("Rendez-vous 07h00 • Départ 08h00");
