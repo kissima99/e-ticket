@@ -16,18 +16,12 @@ test("Choisir les arrêts et horaires des deux trajets dans les deux sens", asyn
   await expect(schedule).toHaveText("Rendez-vous 05h00 • Départ 06h00");
   await page.getByRole("combobox", { name: "Ville de descente" }).click();
   await expect(page.getByRole("option", { name: "Ouro Sogui", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("option", { name: "Kaolack", exact: true })).toBeVisible();
-  await expect(page.getByRole("option", { name: "Fatick", exact: true })).toBeVisible();
-  await expect(page.getByRole("option", { name: "Wour Thierna", exact: true })).toBeVisible();
-  await expect(page.getByRole("option", { name: "Kaolack", exact: true })).toBeVisible();
-  await expect(page.getByRole("option", { name: "Fatick", exact: true })).toBeVisible();
-  await expect(page.getByRole("option", { name: "Wour Thierna", exact: true })).toBeVisible();
   await expect(page.getByRole("option", { name: "Tamba", exact: true })).toBeVisible();
   await page.getByRole("option", { name: "Kidira", exact: true }).click();
   await page.getByLabel("Départ *", { exact: true }).click();
   await page.getByRole("option", { name: "Ballou", exact: true }).click();
   await expect(schedule).toHaveText("Rendez-vous 07h00 • Départ 08h00");
-  await expect(page.getByRole("list", { name: "Arrêts du trajet" })).toHaveText("Ballou→Wour Thierna→Kidira→Goudiry→Tamba→Fatick→Kaolack→Dakar");
+  await expect(page.getByRole("list", { name: "Arrêts du trajet" })).toHaveText("Ballou→Kidira→Goudiry→Tamba→Dakar");
   await page.getByRole("combobox", { name: "Ville de descente" }).click();
   await page.getByRole("option", { name: "Tamba", exact: true }).click();
   const date = new Date();
@@ -49,7 +43,7 @@ test("Choisir les arrêts et horaires des deux trajets dans les deux sens", asyn
   await page.getByLabel("Trajet *", { exact: true }).click();
   await page.getByRole("option", { name: "Via Ouro Sogui", exact: true }).click();
   await expect(schedule).toHaveText("Rendez-vous 06h00 • Départ 08h00");
-  await expect(page.getByRole("combobox", { name: "Ville de descente" })).toHaveText("Ballou");
+  await expect(page.getByRole("combobox", { name: "Ville de descente" })).toHaveText("Dakar");
   await expect(page.getByRole("combobox", { name: "Siège du passager 1" })).toHaveText("Choisir un siège");
   await page.getByRole("combobox", { name: "Siège du passager 1" }).click();
   await expect(page.getByRole("option", { name: "Siège 1 — réservé", exact: true })).toHaveAttribute("aria-disabled", "true");

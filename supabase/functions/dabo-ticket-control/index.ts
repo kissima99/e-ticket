@@ -7,7 +7,7 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("access") }),
   z.object({ action: z.literal("logout") }),
   z.object({ action: z.literal("list"), page: z.number().int().min(0).max(100000), status: z.enum(["ALL", "PAID", "PENDING"]), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")), departure: z.enum(["ALL", "Dakar", "Ballou"]) }),
-  z.object({ action: z.literal("confirm"), reservation_id: z.string().uuid(), amount: z.number().int().min(1).max(1000000) }),
+  z.object({ action: z.literal("confirm"), reservation_id: z.string().uuid() }),
   z.object({ action: z.literal("paid_ticket"), reservation_id: z.string().uuid() }),
   z.object({ action: z.literal("rewards"), page: z.number().int().min(0).max(100000), status: z.enum(["ALL", "PENDING", "FULFILLED"]) }),
   z.object({ action: z.literal("fulfill_reward"), reward_id: z.string().uuid(), reference: z.string().trim().max(120).optional(), confirmed: z.literal(true) }),
@@ -75,11 +75,10 @@ Deno.serve(async req => {
       return reply(data);
     }
     if (request.action === "confirm") {
-      const { data, error } = await client.rpc("confirm_dabo_ticket_payment", { p_reservation: request.reservation_id, p_agent_session: session.id, p_amount: request.amount });
+      const { data, error } = await client.rpc("confirm_dabo_ticket_payment", { p_reservation: request.reservation_id, p_agent_session: session.id });
       if (error) {
         if (error.message.includes("AGENT_ACCESS_DENIED")) return reply({ error: "Session agent invalide.", code: "SESSION_EXPIRED" }, 401);
         if (error.message.includes("TICKET_NOT_FOUND")) return reply({ error: "Ticket introuvable." }, 404);
-        if (error.message.includes("INVALID_AMOUNT")) return reply({ error: "Saisissez un montant positif valide, inférieur ou égal à 1 000 000 FCFA." }, 400);
         if (error.message.includes("INVALID_PAYMENT_STATUS")) return reply({ error: "Ce statut de paiement ne peut pas être confirmé." }, 409);
         throw error;
       }

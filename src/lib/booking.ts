@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { cities, isTravelDateAvailable, routeStops, type TravelRouteId, type TicketSchedule } from "@/lib/travel-routes";
+import { isTravelDateAvailable, routeStops, type TicketSchedule } from "@/lib/travel-routes";
 
+export const cities = ["Dakar", "Ouro Sogui", "Tamba", "Goudiry", "Kidira", "Ballou"];
 export const normalizePhone = (value: string) => {
   let phone = value.replace(/[\s().-]/g, "");
   if (phone.startsWith("00")) phone = `+${phone.slice(2)}`;
@@ -28,7 +29,7 @@ export const passengerSchema = z.object({
 });
 export const paymentSchema = z.object({ payment_method: z.enum(["Cash", "Wave", "OM"], { errorMap: () => ({ message: "Choisissez Cash, Wave ou OM." }) }), promo_code: z.string().trim().toUpperCase().max(50).optional() });
 export const bookingSchema = routeSchema.merge(passengerSchema).merge(paymentSchema).superRefine((data, context) => {
-  if (!new Set<string>(routeStops(data.route_id, data.departure_city).slice(1)).has(data.arrival_city)) context.addIssue({ code: "custom", path: ["arrival_city"], message: "Choisissez un arrêt de descente sur ce trajet." });
+  if (!routeStops(data.route_id, data.departure_city).slice(1).includes(data.arrival_city)) context.addIssue({ code: "custom", path: ["arrival_city"], message: "Choisissez un arrêt de descente sur ce trajet." });
   if (!isTravelDateAvailable(data.travel_date, data.route_id, data.departure_city)) context.addIssue({ code: "custom", path: ["travel_date"], message: "Choisissez un départ futur : lundi, mardi, jeudi ou samedi, selon l’horaire du trajet." });
 });
 export type BookingForm = z.input<typeof bookingSchema>;

@@ -25,17 +25,16 @@ test("L’agent confirme le règlement puis télécharge et partage le PDF final
     } else if (body.action === "rewards") {
       await route.fulfill({ json: { rewards: [], total: 0 } });
     } else if (body.action === "list") {
-      await route.fulfill({ json: { tickets: [{ id: reservationId, ticket_id: filename.replace(".pdf", ""), created_at: new Date().toISOString(), full_name: "Voyageur Démonstration", departure_city: "Dakar", arrival_city: "Ballou", route_id: "tamba_kidira", rendezvous_time: "05:00", departure_time: "06:00", travel_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), seat_number: "1", passenger_count: 1, payment_status: paid ? "Payé" : "En attente", payment_method: "Wave", total_amount: paid ? 10000 : 12000, verification_token: paid ? qrToken : null }], total: 1 } });
+      await route.fulfill({ json: { tickets: [{ id: reservationId, ticket_id: filename.replace(".pdf", ""), created_at: new Date().toISOString(), full_name: "Voyageur Démonstration", departure_city: "Dakar", arrival_city: "Ballou", route_id: "tamba_kidira", rendezvous_time: "05:00", departure_time: "06:00", travel_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), seat_number: "1", passenger_count: 1, payment_status: paid ? "Payé" : "En attente", payment_method: "Wave", total_amount: 12000, verification_token: paid ? qrToken : null }], total: 1 } });
     } else if (body.action === "confirm") {
       expect(body.reservation_id).toBe(reservationId);
-      expect(body.amount).toBe(10000);
       expect(route.request().headers()["x-agent-session"]).toBe("a".repeat(64));
       paid = true;
-      await route.fulfill({ json: { confirmed: true, already_paid: false, amount: body.amount } });
+      await route.fulfill({ json: { confirmed: true, already_paid: false } });
     } else if (body.action === "paid_ticket") {
       expect(body.reservation_id).toBe(reservationId);
       expect(route.request().headers()["x-agent-session"]).toBe("a".repeat(64));
-      await route.fulfill(paid ? { json: { ticket: { ticket_id: filename.replace(".pdf", ""), full_name: "Voyageur Démonstration", phone: "+221771234567", departure_city: "Dakar", arrival_city: "Ballou", route_id: "tamba_kidira", rendezvous_time: "05:00", departure_time: "06:00", travel_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), seat_number: "1", passenger_count: 1, boarding_point: "Gare de Dakar", luggage_count: 1, payment_status: "Payé", payment_method: "Wave", total_amount: 10000, verification_token: qrToken } } } : { status: 409, json: { error: "Le PDF final avec QR est disponible uniquement après validation du paiement." } });
+      await route.fulfill(paid ? { json: { ticket: { ticket_id: filename.replace(".pdf", ""), full_name: "Voyageur Démonstration", phone: "+221771234567", departure_city: "Dakar", arrival_city: "Ballou", route_id: "tamba_kidira", rendezvous_time: "05:00", departure_time: "06:00", travel_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), seat_number: "1", passenger_count: 1, boarding_point: "Gare de Dakar", luggage_count: 1, payment_status: "Payé", payment_method: "Wave", total_amount: 12000, verification_token: qrToken } } } : { status: 409, json: { error: "Le PDF final avec QR est disponible uniquement après validation du paiement." } });
     } else {
       await route.abort();
     }
@@ -47,9 +46,8 @@ test("L’agent confirme le règlement puis télécharge et partage le PDF final
   await expect(page.getByRole("button", { name: "Afficher le QR" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "PDF / WhatsApp" })).toHaveCount(0);
   await page.getByRole("button", { name: "Confirmer le paiement", exact: true }).click();
-  await page.getByLabel("Tarif fixé par la compagnie (FCFA)").fill("10000");
   await expect(page.getByRole("button", { name: "Confirmer payé" })).toBeDisabled();
-  await page.getByRole("checkbox", { name: /J’ai vérifié la réception réelle du montant saisi/ }).check();
+  await page.getByRole("checkbox", { name: /J’ai vérifié la réception réelle du paiement/ }).check();
   await page.getByRole("button", { name: "Confirmer payé" }).click();
   await expect(page.getByRole("dialog").getByRole("heading", { name: "Télécharger et envoyer le ticket final" })).toBeVisible();
   await expect(page.getByRole("dialog").getByRole("img", { name: "QR de vérification du ticket avant embarquement" })).toBeVisible();
@@ -74,7 +72,6 @@ test("L’agent confirme le règlement puis télécharge et partage le PDF final
   expect(pdf).toContain("06h00");
   expect(pdf).toContain("05h00");
   expect(pdf).not.toContain("Payé, DABO TRANSPORT");
-  expect(pdf).toContain("10 000 FCFA");
 
   await page.getByRole("button", { name: "Partager le PDF via WhatsApp" }).click();
   await expect.poll(() => page.evaluate(() => (window as unknown as { sharedTicket?: unknown }).sharedTicket)).toEqual({ name: filename, type: "application/pdf", text: greeting, hasQr: true });

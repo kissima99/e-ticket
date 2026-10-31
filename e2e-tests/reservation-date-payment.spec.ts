@@ -17,7 +17,7 @@ test("Choisir un trajet puis obtenir le QR uniquement après paiement validé", 
       bookingRequest = body.request_id;
       expect(body.data.route_id).toBe("ouro_sogui");
       expect(body.data.arrival_city).toBe("Ouro Sogui");
-      await route.fulfill({ json: { ticket: { ...body.data, rendezvous_time: "12:00", departure_time: "14:00", ticket_id: `BSE-${body.request_id.replace(/-/g, "").toUpperCase()}`, seat_number: body.data.seats.join(", "), passenger_count: body.data.seats.length, total_amount: 24000, payment_status: "En attente", verification_token: null } } });
+      await route.fulfill({ json: { ticket: { ...body.data, rendezvous_time: "12:00", departure_time: "14:00", ticket_id: `BSE-${body.request_id.replace(/-/g, "").toUpperCase()}`, seat_number: body.data.seats.join(", "), passenger_count: body.data.seats.length, total_amount: 20000, payment_status: "En attente", verification_token: null } } });
     } else if (body?.action === "payment_status") {
       expect(body.request_id).toBe(bookingRequest);
       expect(body.phone).toBe("+221771234567");
@@ -54,7 +54,7 @@ test("Choisir un trajet puis obtenir le QR uniquement après paiement validé", 
   await expect(page.getByRole("button", { name: "Retirer un passager" })).toBeDisabled();
   await page.getByRole("button", { name: "Ajouter un passager" }).click();
   await expect(page.getByLabel("Nombre de passagers").getByRole("status")).toHaveText("2Passagers");
-  await expect(page.getByTestId("booking-total")).toHaveText("24 000 FCFA");
+  await expect(page.getByTestId("booking-total")).toHaveText("20 000 FCFA");
   await page.getByRole("combobox", { name: "Siège du passager 1" }).click();
   await page.getByRole("option", { name: "Siège 1", exact: true }).click();
   await page.getByRole("combobox", { name: "Siège du passager 2" }).click();
@@ -94,7 +94,7 @@ test("Choisir un trajet puis obtenir le QR uniquement après paiement validé", 
   expect(pendingPdf).not.toContain("/verification/");
   expect(pendingPdf).toContain("14h00");
   expect(pendingPdf).toContain("12h00");
-  expect(pendingPdf).toContain("24 000 FCFA");
+  expect(pendingPdf).toContain("20 000 FCFA");
 
   paid = true;
   await page.getByRole("button", { name: "Actualiser le paiement" }).click();
