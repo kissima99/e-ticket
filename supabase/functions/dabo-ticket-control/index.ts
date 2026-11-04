@@ -8,6 +8,8 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("logout") }),
   z.object({ action: z.literal("list"), page: z.number().int().min(0).max(100000), status: z.enum(["ALL", "PAID", "PENDING"]), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")), departure: z.enum(["ALL", "Dakar", "Ballou"]) }),
   z.object({ action: z.literal("confirm"), reservation_id: z.string().uuid(), amount: z.number().int().min(1).max(1000000) }),
+  z.object({ action: z.literal("cancel"), reservation_id: z.string().uuid() }),
+  z.object({ action: z.literal("reschedule"), reservation_id: z.string().uuid(), travel_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }),
   z.object({ action: z.literal("paid_ticket"), reservation_id: z.string().uuid() }),
   z.object({ action: z.literal("rewards"), page: z.number().int().min(0).max(100000), status: z.enum(["ALL", "PENDING", "FULFILLED"]) }),
   z.object({ action: z.literal("fulfill_reward"), reward_id: z.string().uuid(), reference: z.string().trim().max(120).optional(), confirmed: z.literal(true) }),
@@ -45,6 +47,27 @@ Deno.serve(async req => {
       const { error } = await client.from("ticket_agent_sessions").update({ revoked: true }).eq("id", session.id);
       if (error) throw error;
       return reply({ signed_out: true });
+    }
+    if (request.action === "cancel") {
+      const { data, error } = await client.rpc("cancel_dabo_ticket", { p_reservation: request.reservation_id, p_agent_session: session.id });
+      if (error) {
+        if (error.message.includes("AGENT_ACCESS_DENIED")) return reply({ error: "Session agent invalide.", code: "SESSION_EXPIRED" }, 401);
+        if (error.message.includes("TICKET_NOT_FOUND")) return reply({ error: "Ticket introuvable." }, 404);
+        throw error;
+      }
+      return reply(data);
+    }
+    if (request.action === "reschedule") {
+      const { data, error } = await client.rpc("reschedule_dabo_ticket", { p_reservation: request.reservation_id, p_agent_session: session.id, p_travel_date: request.travel_date });
+      if (error) {
+        if (error.message.includes("AGENT_ACCESS_DENIED")) return reply({ error: "Session agent invalide.", code: "SESSION_EXPIRED" }, 401);
+        if (error.message.includes("TICKET_NOT_FOUND")) return reply({ error: "Ticket introuvable." }, 404);
+        if (error.message.includes("TICKET_CANCELLED")) return reply({ error: "Ce ticket est annulé et ne peut plus être reporté." }, 409);
+        if (error.message.includes("SEAT_TAKEN")) return reply({ error: "Les sièges ne sont plus disponibles à cette date." }, 409);
+        if (error.message.includes("INVALID_DATE")) return reply({ error: "Choisissez une date future un lundi, mardi, jeudi ou samedi." }, 400);
+        throw error;
+      }
+      return reply(data);
     }
     if (request.action === "paid_ticket") {
       const { data, error } = await client.from("reservations_dabo").select("ticket_id,departure_city,arrival_city,route_id,rendezvous_time,departure_time,travel_date,seat_number,passenger_count,full_name,phone,boarding_point,luggage_count,payment_method,payment_status,total_amount,verification_token").eq("id", request.reservation_id).maybeSingle();

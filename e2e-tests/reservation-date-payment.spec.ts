@@ -21,7 +21,7 @@ test("Choisir un trajet puis obtenir le QR uniquement après paiement validé", 
     } else if (body?.action === "payment_status") {
       expect(body.request_id).toBe(bookingRequest);
       expect(body.phone).toBe("+221771234567");
-      await route.fulfill({ json: { payment_status: paid ? "Payé" : "En attente", verification_token: paid ? qrToken : null } });
+      await route.fulfill({ json: { payment_status: paid ? "Payé" : "En attente", travel_date: dateValue, verification_token: paid ? qrToken : null } });
     } else {
       await route.abort();
     }

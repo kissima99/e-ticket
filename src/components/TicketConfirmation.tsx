@@ -4,6 +4,8 @@ import { Link } from "react-router-dom";
 import { CheckCircle2, Clock3, Download, Loader2, MessageCircle, RefreshCw, Share2, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import TravelDatePicker from "@/components/TravelDatePicker";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { formatAmount, formatTravelDate, type BookingTicket } from "@/lib/booking";
@@ -18,6 +20,10 @@ export default function TicketConfirmation({ ticket: initialTicket, requestId, o
   const [downloading, setDownloading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [verified, setVerified] = useState(false);
+  const [dateDialogOpen, setDateDialogOpen] = useState(false);
+  const [newTravelDate, setNewTravelDate] = useState(initialTicket.travel_date);
+  const [dateSaving, setDateSaving] = useState(false);
+  const [dateError, setDateError] = useState("");
   const [statusError, setStatusError] = useState("");
   const mounted = useRef(true);
   const paid = verified && hasPaidQr(ticket);
@@ -29,8 +35,8 @@ export default function TicketConfirmation({ ticket: initialTicket, requestId, o
     setRefreshing(true);
     try {
       const { data, error } = await supabase.functions.invoke("dabo-booking", { body: { action: "payment_status", request_id: requestId, phone: initialTicket.phone } });
-      if (error || data?.error || typeof data?.payment_status !== "string" || !(data.verification_token === null || typeof data.verification_token === "string")) throw new Error("Impossible de vérifier le paiement. Réessayez avant de télécharger le ticket.");
-      const next: BookingTicket = { ...initialTicket, payment_status: data.payment_status, verification_token: data.payment_status === "Payé" ? data.verification_token : null };
+      if (error || data?.error || typeof data?.payment_status !== "string" || typeof data?.travel_date !== "string" || !(data.verification_token === null || typeof data.verification_token === "string")) throw new Error("Impossible de vérifier le paiement. Réessayez avant de télécharger le ticket.");
+      const next: BookingTicket = { ...initialTicket, travel_date: data.travel_date, payment_status: data.payment_status, verification_token: data.payment_status === "Payé" ? data.verification_token : null };
       if (next.payment_status === "Payé" && !hasPaidQr(next)) throw new Error("Le paiement est indiqué comme payé, mais le QR n’a pas été reçu. Actualisez le ticket.");
       if (mounted.current) { setTicket(next); setVerified(true); setStatusError(""); }
       return next;
@@ -53,6 +59,19 @@ export default function TicketConfirmation({ ticket: initialTicket, requestId, o
     window.addEventListener("focus", refresh); window.addEventListener("online", refresh);
     return () => { mounted.current = false; window.clearInterval(timer); window.removeEventListener("focus", refresh); window.removeEventListener("online", refresh); };
   }, [refreshTicket]);
+
+  async function modifyTravelDate() {
+    if (dateSaving || !newTravelDate || newTravelDate === ticket.travel_date) return;
+    setDateSaving(true); setDateError("");
+    try {
+      const { data, error } = await supabase.functions.invoke("dabo-booking", { body: { action: "modify_date", request_id: requestId, phone: initialTicket.phone, travel_date: newTravelDate } });
+      if (error || data?.error || data?.travel_date !== newTravelDate) throw new Error(data?.error || "La date n’a pas pu être modifiée.");
+      setTicket(previous => ({ ...previous, travel_date: newTravelDate }));
+      setDateDialogOpen(false);
+      toast.success("La date de départ a été modifiée.");
+    } catch (error) { setDateError(error instanceof Error ? error.message : "Modification impossible."); }
+    finally { setDateSaving(false); }
+  }
 
   async function download() {
     setDownloading(true);
@@ -86,6 +105,7 @@ export default function TicketConfirmation({ ticket: initialTicket, requestId, o
           <p className="text-xs uppercase tracking-wider text-slate-500">Numéro de ticket</p><p className="mb-6 mt-1 break-all font-mono text-sm font-bold text-brand-navy sm:text-base">{ticket.ticket_id}</p>
           {paid ? <TicketQr ticket={ticket} /> : <div className="mb-6 rounded-2xl border border-orange-200 bg-orange-50 p-5 text-orange-900"><p className="font-bold">{verified ? "Paiement en attente" : "Paiement à vérifier"}</p><p className="mt-2 text-sm leading-relaxed">Aucun QR n’est délivré avant confirmation du règlement réel par DABO TRANSPORT. Le ticket s’actualise automatiquement sur cette page.</p></div>}
           {statusError && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-4 text-sm text-red-800">{statusError}</p>}
+          <Button variant="outline" disabled={busy || ticket.payment_status === "Annulé"} onClick={() => { setNewTravelDate(ticket.travel_date); setDateError(""); setDateDialogOpen(true); }} className="mb-3 h-11 w-full rounded-xl border-orange-300 text-brand-navy hover:bg-orange-50">Modifier la date de départ</Button>
           <Button variant="outline" disabled={busy} onClick={() => void refreshTicket().catch(() => {})} className="mb-6 h-11 w-full rounded-xl border-slate-300 text-brand-navy">{refreshing ? <Loader2 className="animate-spin" /> : <RefreshCw />} Actualiser le paiement</Button>
           <dl className="grid gap-5 text-sm sm:grid-cols-2">{[["Voyageur principal", ticket.full_name], ["Téléphone", ticket.phone], ["Siège(s)", ticket.seat_number], ["Passagers", String(ticket.passenger_count)], ["Point de montée", ticket.boarding_point], ["Bagages", String(ticket.luggage_count)]].map(([label, value]) => <div key={label}><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 break-words font-semibold text-brand-navy">{value}</dd></div>)}</dl>
           <div className="my-6 flex flex-wrap items-center justify-between gap-3 border-y border-dashed border-slate-300 py-5"><div><p className="text-xs text-slate-500">{paid ? "Montant payé" : "Total à régler"} • {ticket.payment_method}</p><p className="mt-1 text-2xl font-extrabold text-brand-navy">{formatAmount(ticket.total_amount)}</p></div><span className={`rounded-full px-4 py-2 text-xs font-bold ${paid ? "bg-green-50 text-green-900" : "bg-orange-50 text-orange-900"}`}>{paid ? "Payé" : verified ? "Paiement en attente" : "Paiement à vérifier"}</span></div>
@@ -98,6 +118,14 @@ export default function TicketConfirmation({ ticket: initialTicket, requestId, o
           <Button variant="ghost" disabled={sharing || downloading} onClick={onNewBooking} className="mt-6 w-full rounded-xl text-brand-navy hover:bg-orange-50">Faire une nouvelle réservation</Button>
         </CardContent>
       </Card>
+      <Dialog open={dateDialogOpen} onOpenChange={open => { if (!dateSaving) setDateDialogOpen(open); }}>
+        <DialogContent className="rounded-3xl text-brand-navy">
+          <DialogHeader><DialogTitle>Modifier la date de départ</DialogTitle><DialogDescription>Choisissez un autre départ disponible. Vos sièges seront conservés si l’un d’eux est encore libre.</DialogDescription></DialogHeader>
+          <TravelDatePicker id="modify-travel-date" value={newTravelDate} departure={ticket.departure_city} routeId={ticket.route_id || "ouro_sogui"} onChange={setNewTravelDate} />
+          {dateError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{dateError}</p>}
+          <div className="grid grid-cols-2 gap-3"><Button variant="outline" disabled={dateSaving} onClick={() => setDateDialogOpen(false)} className="h-12 rounded-xl">Annuler</Button><Button disabled={dateSaving || !newTravelDate || newTravelDate === ticket.travel_date} onClick={() => void modifyTravelDate()} className="h-12 rounded-xl bg-brand-orange font-bold text-brand-navy hover:bg-orange-500">{dateSaving && <Loader2 className="animate-spin" />} Enregistrer</Button></div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

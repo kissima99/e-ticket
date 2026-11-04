@@ -6,7 +6,7 @@ const cities = ["Dakar", "Ouro Sogui", "Touba", "Dara Djolof", "Ranérou", "Sèm
 const phone = z.string().trim().regex(/^\+[1-9]\d{7,14}$/);
 const routeSchema = z.object({ route_id: z.enum(["ouro_sogui", "tamba_kidira"]), departure_city: z.enum(["Dakar", "Ballou"]), travel_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => { const d = new Date(`${value}T12:00:00Z`); return Number.isFinite(d.getTime()) && d.toISOString().slice(0,10) === value; }) });
 const bookingSchema = routeSchema.extend({ arrival_city: z.string().refine(value => cities.includes(value)), seats: z.array(z.string().regex(/^([1-9]|[1-6][0-9]|70)$/)).min(1).max(5).refine(value => new Set(value).size === value.length), civility: z.enum(["M.", "Mme", "Mlle"]), full_name: z.string().trim().min(2).max(100), phone, identity_document_type: z.enum(["CNI", "Passeport"]), identity_document_number: z.string().trim().min(3).max(50), emergency_contact: phone, boarding_point: z.string().trim().min(3).max(150), luggage_count: z.number().int().min(0).max(5), payment_method: z.enum(["Cash", "Wave", "OM"]), promo_code: z.string().trim().toUpperCase().max(50).optional() });
-const requestSchema = z.discriminatedUnion("action", [z.object({ action: z.literal("availability"), data: routeSchema }), z.object({ action: z.literal("book"), request_id: z.string().uuid(), data: bookingSchema }), z.object({ action: z.literal("payment_status"), request_id: z.string().uuid(), phone })]);
+const requestSchema = z.discriminatedUnion("action", [z.object({ action: z.literal("availability"), data: routeSchema }), z.object({ action: z.literal("book"), request_id: z.string().uuid(), data: bookingSchema }), z.object({ action: z.literal("payment_status"), request_id: z.string().uuid(), phone }), z.object({ action: z.literal("modify_date"), request_id: z.string().uuid(), phone, travel_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) })]);
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" } });
 
 // Public booking; status access requires the reservation's private request ID and phone.
@@ -22,16 +22,27 @@ Deno.serve(async req => {
     const client = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false, autoRefreshToken: false } });
     const request = input.data;
     if (request.action === "availability") {
-      const { data, error } = await client.from("reservations_dabo").select("seat_number").eq("departure_city", request.data.departure_city).eq("travel_date", request.data.travel_date).or(`route_id.eq.${request.data.route_id},route_id.is.null`);
+      const { data, error } = await client.from("reservations_dabo").select("seat_number").eq("departure_city", request.data.departure_city).eq("travel_date", request.data.travel_date).neq("payment_status", "Annulé").or(`route_id.eq.${request.data.route_id},route_id.is.null`);
       if (error) throw error;
       const taken = [...new Set((data || []).flatMap(row => row.seat_number.split(",").map((value: string) => value.trim())))];
       return reply({ taken });
     }
     if (request.action === "payment_status") {
-      const { data, error } = await client.from("reservations_dabo").select("payment_status,verification_token").eq("request_id", request.request_id).eq("phone", request.phone).maybeSingle();
+      const { data, error } = await client.from("reservations_dabo").select("payment_status,verification_token,travel_date").eq("request_id", request.request_id).eq("phone", request.phone).maybeSingle();
       if (error) throw error;
       if (!data) return reply({ error: "Réservation introuvable ou accès refusé." }, 404);
-      return reply({ payment_status: data.payment_status, verification_token: data.payment_status === "Payé" ? data.verification_token : null });
+      return reply({ payment_status: data.payment_status, verification_token: data.payment_status === "Payé" ? data.verification_token : null, travel_date: data.travel_date });
+    }
+    if (request.action === "modify_date") {
+      const { data, error } = await client.rpc("modify_dabo_travel_date", { p_request_id: request.request_id, p_phone: request.phone, p_travel_date: request.travel_date });
+      if (error) {
+        if (error.message.includes("TICKET_NOT_FOUND")) return reply({ error: "Ticket introuvable ou accès refusé." }, 404);
+        if (error.message.includes("TICKET_CANCELLED")) return reply({ error: "Ce ticket a été annulé et ne peut plus être modifié." }, 409);
+        if (error.message.includes("SEAT_TAKEN")) return reply({ error: "Les sièges ne sont plus disponibles à cette date.", code: "SEAT_TAKEN" }, 409);
+        if (error.message.includes("INVALID_DATE")) return reply({ error: "Choisissez une date future un lundi, mardi, jeudi ou samedi." }, 400);
+        throw error;
+      }
+      return reply({ travel_date: data.travel_date });
     }
     const { data, error } = await client.rpc("create_dabo_booking", { p_request_id: request.request_id, p_data: request.data });
     if (error) {

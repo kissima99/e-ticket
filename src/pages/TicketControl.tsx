@@ -1,7 +1,7 @@
 import { ticketScheduleText } from "@/lib/travel-routes";
 import { useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { CheckCircle2, ChevronLeft, ChevronRight, Loader2, LogOut, QrCode, RefreshCw, ShieldCheck } from "lucide-react";
+import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, CircleX, Loader2, LogOut, QrCode, RefreshCw, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,11 @@ export default function TicketControl() {
   const [confirmationError, setConfirmationError] = useState("");
   const [signingOut, setSigningOut] = useState(false);
   const [deliveryTicketId, setDeliveryTicketId] = useState<string | null>(null);
+  const [actionTicket, setActionTicket] = useState<ControlledTicket | null>(null);
+  const [actionMode, setActionMode] = useState<"cancel" | "reschedule" | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [acting, setActing] = useState(false);
 
   useEffect(() => {
     if (!session) return;
@@ -90,6 +95,25 @@ export default function TicketControl() {
     finally { setConfirming(false); }
   }
 
+  async function runTicketAction() {
+    if (!actionTicket || !actionMode || acting || !session) return;
+    setActing(true); setActionError("");
+    try {
+      if (actionMode === "cancel") {
+        const data = await ticketControlRequest<{ cancelled: boolean }>({ action: "cancel", reservation_id: actionTicket.id }, session.token);
+        if (!data.cancelled) throw new Error("Annulation non confirmée.");
+        toast.success("Le ticket a été annulé.");
+      } else {
+        if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(rescheduleDate)) throw new Error("Choisissez une date valide.");
+        const data = await ticketControlRequest<{ travel_date: string }>({ action: "reschedule", reservation_id: actionTicket.id, travel_date: rescheduleDate }, session.token);
+        if (data.travel_date !== rescheduleDate) throw new Error("Report non confirmé.");
+        toast.success("Le voyage a été reporté.");
+      }
+      setActionTicket(null); setActionMode(null); setRefresh(value => value + 1);
+    } catch (err) { if (err instanceof AgentSessionExpiredError) clearSession(); setActionError(err instanceof Error ? err.message : "Action impossible."); }
+    finally { setActing(false); }
+  }
+
   if (!session) return <Navigate to="/agent/connexion" replace />;
 
   return (
@@ -118,7 +142,7 @@ export default function TicketControl() {
                 <p className="mt-2 text-sm leading-relaxed text-slate-600">{formatTravelDate(ticket.travel_date)} • {ticketScheduleText(ticket)}</p>
                 <dl className="mt-4 grid grid-cols-2 gap-4 text-sm"><div><dt className="text-slate-500">Siège(s)</dt><dd className="mt-1 font-bold">{ticket.seat_number}</dd></div><div><dt className="text-slate-500">Passagers</dt><dd className="mt-1 font-bold">{ticket.passenger_count}</dd></div><div><dt className="text-slate-500">Mode de paiement</dt><dd className="mt-1 font-bold">{ticket.payment_method}</dd></div><div><dt className="text-slate-500">Montant enregistré</dt><dd className="mt-1 font-bold">{ticket.total_amount === null ? "Non renseigné" : formatAmount(ticket.total_amount)}</dd></div></dl>
                 <p className="mt-4 break-all rounded-xl bg-slate-50 p-3 font-mono text-xs">{ticket.ticket_id}</p>
-                <div className="mt-4 flex flex-wrap gap-2">{ticket.payment_status === "Payé" && ticket.verification_token && <><Button variant="outline" onClick={() => setQrTicket(ticket)} className="rounded-xl"><QrCode /> Afficher le QR</Button><Button asChild variant="outline" className="rounded-xl"><Link to={`/verification/${ticket.verification_token}`}>Vérifier le ticket</Link></Button><Button onClick={() => setDeliveryTicketId(ticket.id)} className="rounded-xl bg-green-700 font-bold text-white hover:bg-green-800">PDF / WhatsApp</Button></>}{ticket.payment_status === "En attente" && <Button disabled={confirming} onClick={() => { setPaymentTicket(ticket); setPaymentAmount(ticket.total_amount ? String(ticket.total_amount) : ""); setAccepted(false); setConfirmationError(""); }} className="rounded-xl bg-brand-orange font-bold text-brand-navy hover:bg-orange-500"><CheckCircle2 /> Confirmer le paiement</Button>}</div>
+                <div className="mt-4 flex flex-wrap gap-2">{ticket.payment_status === "Payé" && ticket.verification_token && <><Button variant="outline" onClick={() => setQrTicket(ticket)} className="rounded-xl"><QrCode /> Afficher le QR</Button><Button asChild variant="outline" className="rounded-xl"><Link to={`/verification/${ticket.verification_token}`}>Vérifier le ticket</Link></Button><Button onClick={() => setDeliveryTicketId(ticket.id)} className="rounded-xl bg-green-700 font-bold text-white hover:bg-green-800">PDF / WhatsApp</Button></>}{ticket.payment_status === "En attente" && <Button disabled={confirming} onClick={() => { setPaymentTicket(ticket); setPaymentAmount(ticket.total_amount ? String(ticket.total_amount) : ""); setAccepted(false); setConfirmationError(""); }} className="rounded-xl bg-brand-orange font-bold text-brand-navy hover:bg-orange-500"><CheckCircle2 /> Confirmer le paiement</Button>}{ticket.payment_status !== "Annulé" && <><Button variant="outline" disabled={confirming || acting} onClick={() => { setActionTicket(ticket); setActionMode("reschedule"); setRescheduleDate(ticket.travel_date); setActionError(""); }} className="rounded-xl border-blue-200 text-blue-800 hover:bg-blue-50"><CalendarDays /> Reporter</Button><Button variant="outline" disabled={confirming || acting} onClick={() => { setActionTicket(ticket); setActionMode("cancel"); setActionError(""); }} className="rounded-xl border-red-200 text-red-800 hover:bg-red-50"><CircleX /> Annuler le ticket</Button></>}</div>
               </article>)}
             </div>
           )}
@@ -128,6 +152,7 @@ export default function TicketControl() {
       {deliveryTicketId && <AgentTicketDelivery reservationId={deliveryTicketId} onClose={() => setDeliveryTicketId(null)} />}
       <Dialog open={Boolean(qrTicket)} onOpenChange={open => { if (!open) setQrTicket(null); }}><DialogContent className="max-h-[90dvh] overflow-y-auto rounded-3xl text-brand-navy"><DialogHeader><DialogTitle>QR du ticket enregistré</DialogTitle><DialogDescription>{qrTicket?.full_name} • {qrTicket?.departure_city} → {qrTicket?.arrival_city}</DialogDescription></DialogHeader>{qrTicket && <><p className="mb-3 text-sm font-semibold">Paiement enregistré : {qrTicket.payment_status}</p><TicketQr ticket={qrTicket} /></>}</DialogContent></Dialog>
       <Dialog open={Boolean(paymentTicket)} onOpenChange={open => { if (!open && !confirming) { setPaymentTicket(null); setAccepted(false); setConfirmationError(""); } }}><DialogContent className="rounded-3xl text-brand-navy"><DialogHeader><DialogTitle>Confirmer le règlement réel</DialogTitle><DialogDescription>Cette action enregistre le ticket comme payé. Elle n’effectue aucun débit Wave ou Orange Money et ne valide pas l’embarquement.</DialogDescription></DialogHeader>{paymentTicket && <div className="rounded-2xl bg-slate-50 p-4 text-sm"><p className="font-bold">{paymentTicket.full_name}</p><p className="mt-2">{paymentTicket.departure_city} → {paymentTicket.arrival_city} • Siège(s) {paymentTicket.seat_number}</p><p className="mt-2 font-bold">{paymentTicket.total_amount === null ? "Montant non renseigné : vérifiez le règlement auprès de la compagnie." : formatAmount(paymentTicket.total_amount)} • {paymentTicket.payment_method}</p></div>}<div className="space-y-2"><Label htmlFor="payment-amount">Montant réellement reçu (FCFA)</Label><Input id="payment-amount" type="number" min="1" max="1000000" step="1" value={paymentAmount} onChange={event => setPaymentAmount(event.target.value)} disabled={confirming} className="h-12 rounded-xl" /><p className="text-xs text-slate-600">L’agent peut corriger manuellement le tarif de cet arrêt avant de confirmer le paiement.</p></div><label className="flex cursor-pointer items-start gap-3 rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm leading-relaxed"><Checkbox checked={accepted} onCheckedChange={value => setAccepted(value === true)} disabled={confirming} className="mt-1 border-orange-700 data-[state=checked]:bg-brand-navy" /><span>J’ai vérifié la réception réelle du paiement par la compagnie, pas seulement une capture d’écran ou le choix d’un mode de paiement.</span></label>{confirmationError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{confirmationError}</p>}<div className="grid grid-cols-2 gap-3"><Button variant="outline" disabled={confirming} onClick={() => setPaymentTicket(null)} className="h-12 rounded-xl">Annuler</Button><Button disabled={!accepted || confirming} onClick={() => void confirmPayment()} className="h-12 rounded-xl bg-brand-orange font-bold text-brand-navy hover:bg-orange-500">{confirming && <Loader2 className="animate-spin" />}Confirmer payé</Button></div></DialogContent></Dialog>
+      <Dialog open={Boolean(actionTicket)} onOpenChange={open => { if (!open && !acting) { setActionTicket(null); setActionMode(null); setActionError(""); } }}><DialogContent className="rounded-3xl text-brand-navy"><DialogHeader><DialogTitle>{actionMode === "cancel" ? "Annuler le ticket" : "Reporter le voyage"}</DialogTitle><DialogDescription>{actionMode === "cancel" ? "Cette action rend le ticket inutilisable et libère ses sièges." : "Choisissez une nouvelle date disponible pour conserver les sièges du ticket."}</DialogDescription></DialogHeader>{actionTicket && <div className="rounded-2xl bg-slate-50 p-4 text-sm"><p className="font-bold">{actionTicket.full_name}</p><p className="mt-2">{actionTicket.departure_city} → {actionTicket.arrival_city}</p><p className="mt-1">Ticket : {actionTicket.ticket_id}</p></div>}{actionMode === "reschedule" && actionTicket && <div className="space-y-2"><Label htmlFor="agent-reschedule-date">Nouvelle date de départ</Label><Input id="agent-reschedule-date" type="date" value={rescheduleDate} onChange={event => setRescheduleDate(event.target.value)} className="h-12 rounded-xl" /><p className="text-xs text-slate-600">Départs disponibles : lundi, mardi, jeudi et samedi.</p></div>}{actionError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{actionError}</p>}<div className="grid grid-cols-2 gap-3"><Button variant="outline" disabled={acting} onClick={() => setActionTicket(null)} className="h-12 rounded-xl">Annuler</Button><Button disabled={acting || (actionMode === "reschedule" && !rescheduleDate)} onClick={() => void runTicketAction()} className={`h-12 rounded-xl font-bold ${actionMode === "cancel" ? "bg-red-700 text-white hover:bg-red-800" : "bg-blue-700 text-white hover:bg-blue-800"}`}>{acting && <Loader2 className="animate-spin" />}{actionMode === "cancel" ? "Confirmer l’annulation" : "Confirmer le report"}</Button></div></DialogContent></Dialog>
     </div>
   );
 }
