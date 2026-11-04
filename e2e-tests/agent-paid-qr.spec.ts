@@ -25,7 +25,7 @@ test("L’agent confirme le règlement puis télécharge et partage le PDF final
     } else if (body.action === "rewards") {
       await route.fulfill({ json: { rewards: [], total: 0 } });
     } else if (body.action === "list") {
-      await route.fulfill({ json: { tickets: [{ id: reservationId, ticket_id: filename.replace(".pdf", ""), created_at: new Date().toISOString(), full_name: "Voyageur Démonstration", departure_city: "Dakar", arrival_city: "Ballou", route_id: "tamba_kidira", rendezvous_time: "05:00", departure_time: "06:00", travel_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), seat_number: "1", passenger_count: 1, payment_status: paid ? "Payé" : "En attente", payment_method: "Wave", total_amount: 12000, verification_token: paid ? qrToken : null }], total: 1 } });
+      await route.fulfill({ json: { tickets: [{ id: reservationId, ticket_id: filename.replace(".pdf", ""), created_at: new Date().toISOString(), full_name: "Voyageur Démonstration", phone: "+221771234567", departure_city: "Dakar", arrival_city: "Ballou", route_id: "tamba_kidira", rendezvous_time: "05:00", departure_time: "06:00", travel_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), seat_number: "1", passenger_count: 1, payment_status: paid ? "Payé" : "En attente", payment_method: "Wave", total_amount: 12000, verification_token: paid ? qrToken : null }], total: 1 } });
     } else if (body.action === "confirm") {
       expect(body.reservation_id).toBe(reservationId);
       expect(body.amount).toBe(9500);

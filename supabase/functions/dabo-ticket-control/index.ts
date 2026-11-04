@@ -109,7 +109,7 @@ Deno.serve(async req => {
       console.info("[dabo-ticket-control] Payment confirmation recorded", { reservation_id: request.reservation_id, agent_session_id: session.id, already_paid: data.already_paid });
       return reply(data);
     }
-    let query = client.from("reservations_dabo").select("id,ticket_id,created_at,full_name,departure_city,arrival_city,route_id,rendezvous_time,departure_time,travel_date,seat_number,passenger_count,payment_status,payment_method,total_amount,verification_token", { count: "exact" });
+    let query = client.from("reservations_dabo").select("id,ticket_id,created_at,full_name,phone,departure_city,arrival_city,route_id,rendezvous_time,departure_time,travel_date,seat_number,passenger_count,payment_status,payment_method,total_amount,verification_token", { count: "exact" });
     if (request.status !== "ALL") query = query.eq("payment_status", request.status === "PAID" ? "Payé" : "En attente");
     if (request.date) query = query.eq("travel_date", request.date);
     if (request.departure !== "ALL") query = query.eq("departure_city", request.departure);

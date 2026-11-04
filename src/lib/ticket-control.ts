@@ -6,6 +6,7 @@ export type ControlledTicket = TicketSchedule & {
   ticket_id: string;
   created_at: string;
   full_name: string;
+  phone: string;
   departure_city: string;
   arrival_city: string;
   travel_date: string;
