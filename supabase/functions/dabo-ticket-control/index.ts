@@ -12,6 +12,9 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("reschedule"), reservation_id: z.string().uuid(), travel_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }),
   z.object({ action: z.literal("paid_ticket"), reservation_id: z.string().uuid() }),
   z.object({ action: z.literal("rewards"), page: z.number().int().min(0).max(100000), status: z.enum(["ALL", "PENDING", "FULFILLED"]) }),
+  z.object({ action: z.literal("list_announcements") }),
+  z.object({ action: z.literal("create_announcement"), type: z.enum(["PANNE", "TARIF", "NOTE"]), title: z.string().trim().min(3).max(120), message: z.string().trim().min(3).max(2000), effective_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")).optional() }),
+  z.object({ action: z.literal("delete_announcement"), announcement_id: z.string().uuid() }),
   z.object({ action: z.literal("fulfill_reward"), reward_id: z.string().uuid(), reference: z.string().trim().max(120).optional(), confirmed: z.literal(true) }),
 ]);
 const reply = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" } });
@@ -77,6 +80,21 @@ Deno.serve(async req => {
       if (data.total_amount === null) return reply({ error: "Montant du ticket non renseigné. Faites vérifier ce ticket par la compagnie avant de l’envoyer." }, 409);
       console.info("[dabo-ticket-control] Paid ticket prepared for delivery", { reservation_id: request.reservation_id, agent_session_id: session.id });
       return reply({ ticket: { ...data, boarding_point: data.boarding_point ?? "Non renseigné", luggage_count: data.luggage_count ?? 0 } });
+    }
+    if (request.action === "list_announcements") {
+      const { data, error } = await client.from("announcements").select("id,type,title,message,effective_date,is_active,created_at").order("created_at", { ascending: false });
+      if (error) throw error;
+      return reply({ announcements: data || [] });
+    }
+    if (request.action === "create_announcement") {
+      const { data, error } = await client.from("announcements").insert({ type: request.type, title: request.title, message: request.message, effective_date: request.effective_date || null, is_active: true }).select("id,type,title,message,effective_date,is_active,created_at").single();
+      if (error) throw error;
+      return reply({ announcement: data });
+    }
+    if (request.action === "delete_announcement") {
+      const { error } = await client.from("announcements").delete().eq("id", request.announcement_id);
+      if (error) throw error;
+      return reply({ deleted: true });
     }
     if (request.action === "rewards") {
       let query = client.from("reward_requests").select("id,account_phone,phone,operator,reward_type,status,amount_fcfa,fulfillment_reference,fulfilled_at,created_at", { count: "exact" });

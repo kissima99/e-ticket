@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import TransportHeader from "@/components/TransportHeader";
 import TicketQr from "@/components/TicketQr";
 import RewardAdministration from "@/components/RewardAdministration";
+import AnnouncementAdministration from "@/components/AnnouncementAdministration";
 import AgentTicketDelivery from "@/components/AgentTicketDelivery";
 import { useAgentSession } from "@/contexts/AgentSessionContext";
 import { formatAmount, formatTravelDate } from "@/lib/booking";
@@ -126,6 +127,7 @@ export default function TicketControl() {
         </div>
         {authorizing ? <p role="status" className="flex items-center gap-3 rounded-2xl bg-white p-6"><Loader2 className="animate-spin" /> Vérification de votre autorisation…</p> : !authorized ? <section className="rounded-3xl border border-red-200 bg-red-50 p-6 text-red-900"><h2 className="text-xl font-bold">Accès non autorisé ou indisponible</h2><p role="alert" className="mt-3">{accessError}</p><Button variant="outline" onClick={() => setAccessRetry(value => value + 1)} className="mt-5 rounded-xl"><RefreshCw /> Réessayer</Button></section> : <>
           <RewardAdministration />
+          <AnnouncementAdministration />
           <section aria-label="Filtres des tickets" className="mb-6 grid gap-4 rounded-3xl border border-slate-200 bg-white p-5 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-2"><Label htmlFor="control-status">Paiement</Label><Select value={filters.status} onValueChange={value => updateFilters({ status: value as TicketFilters["status"] })} disabled={confirming}><SelectTrigger id="control-status" className="h-12 rounded-xl"><SelectValue /></SelectTrigger><SelectContent>{[["ALL", "Tous les tickets"], ["PAID", "Payés"], ["PENDING", "En attente"]].map(([value, title]) => <SelectItem key={value} value={value}>{title}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-2"><Label htmlFor="control-date">Date du voyage</Label><Input id="control-date" type="date" value={filters.date} onChange={event => updateFilters({ date: event.target.value })} disabled={confirming} className="h-12 rounded-xl" /></div>
