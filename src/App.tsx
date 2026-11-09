@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Reservation from "./pages/Reservation";
 import Fidelite from "./pages/Fidelite";
 import Info from "./pages/Info";
+import Yobontes from "./pages/Yobontes";
 import TicketVerification from "./pages/TicketVerification";
 import AgentLogin from "./pages/AgentLogin";
 import TicketControl from "./pages/TicketControl";
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/reservation" element={<Reservation />} />
             <Route path="/fidelite" element={<Fidelite />} />
             <Route path="/info" element={<Info />} />
+            <Route path="/yobontes" element={<Yobontes />} />
             <Route path="/verification/:token" element={<TicketVerification />} />
             <Route path="/agent/connexion" element={<AgentLogin />} />
             <Route path="/controle-tickets" element={<TicketControl />} />
