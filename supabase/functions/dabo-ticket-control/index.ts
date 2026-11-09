@@ -15,6 +15,8 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("list_announcements") }),
   z.object({ action: z.literal("create_announcement"), type: z.enum(["PANNE", "TARIF", "NOTE"]), title: z.string().trim().min(3).max(120), message: z.string().trim().min(3).max(2000), effective_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")).optional() }),
   z.object({ action: z.literal("delete_announcement"), announcement_id: z.string().uuid() }),
+  z.object({ action: z.literal("list_yobontes") }),
+  z.object({ action: z.literal("confirm_yobontes_payment"), shipment_id: z.string().uuid(), amount: z.number().int().min(1).max(1000000) }),
   z.object({ action: z.literal("fulfill_reward"), reward_id: z.string().uuid(), reference: z.string().trim().max(120).optional(), confirmed: z.literal(true) }),
 ]);
 const reply = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" } });
@@ -95,6 +97,22 @@ Deno.serve(async req => {
       const { error } = await client.from("announcements").delete().eq("id", request.announcement_id);
       if (error) throw error;
       return reply({ deleted: true });
+    }
+    if (request.action === "list_yobontes") {
+      const { data, error } = await client.from("yobontes_shipments").select("id,sender_name,sender_phone,sender_residence,receiver_name,receiver_phone,receiver_address,package_type,amount_fcfa,status,payment_status,payment_confirmed_at,created_at").order("created_at", { ascending: false });
+      if (error) throw error;
+      return reply({ shipments: data || [] });
+    }
+    if (request.action === "confirm_yobontes_payment") {
+      const { data, error } = await client.rpc("confirm_yobontes_payment", { p_shipment: request.shipment_id, p_agent_session: session.id, p_amount: request.amount });
+      if (error) {
+        if (error.message.includes("AGENT_ACCESS_DENIED")) return reply({ error: "Session agent invalide.", code: "SESSION_EXPIRED" }, 401);
+        if (error.message.includes("SHIPMENT_NOT_FOUND")) return reply({ error: "Demande de colis introuvable." }, 404);
+        if (error.message.includes("SHIPMENT_CANCELLED")) return reply({ error: "Cette demande de colis est annulée." }, 409);
+        if (error.message.includes("INVALID_AMOUNT")) return reply({ error: "Le montant saisi est invalide." }, 400);
+        throw error;
+      }
+      return reply(data);
     }
     if (request.action === "rewards") {
       let query = client.from("reward_requests").select("id,account_phone,phone,operator,reward_type,status,amount_fcfa,fulfillment_reference,fulfilled_at,created_at", { count: "exact" });
